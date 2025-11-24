@@ -10,7 +10,7 @@ interface WebRTCViewerProps {
 }
 
 export default function WebRTCViewer({ 
-  serverUrl = 'http://localhost:3000',
+  serverUrl = 'http://localhost:3002',
   signalingUrl = 'ws://localhost:3002',
   theme = 'dark' 
 }: WebRTCViewerProps) {
@@ -45,13 +45,14 @@ export default function WebRTCViewer({
       const response = await fetch(`${serverUrl}/status`);
       if (response.ok) {
         const data = await response.json();
+        console.log('Server status:', data);
         return data;
       } else {
-        setError('Server not responding');
+        console.warn('Server status check failed:', response.status);
         return null;
       }
     } catch (err) {
-      setError('Cannot connect to server');
+      console.warn('Server status check error:', err);
       return null;
     }
   };
@@ -199,7 +200,7 @@ export default function WebRTCViewer({
 
       ws.onerror = (err) => {
         console.error('Signaling WebSocket error:', err);
-        setError('Failed to connect to signaling server');
+        setError(`Failed to connect to signaling server at ${streamingUrl}`);
         setConnecting(false);
         setConnectionState('error');
       };
@@ -318,18 +319,23 @@ export default function WebRTCViewer({
       {/* Video Display */}
       <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
         {error ? (
-          <div className="text-center">
+          <div className="text-center max-w-md">
             <div 
-              className="text-sm mb-2"
-              style={{ color: themeColors.textSecondary }}
+              className="text-sm mb-2 font-medium"
+              style={{ color: '#ef4444' }}
             >
               {error}
             </div>
             <div 
-              className="text-xs mb-4"
+              className="text-xs mb-4 leading-relaxed"
               style={{ color: themeColors.textSecondary }}
             >
-              Make sure the backend server is running and the mobile app is streaming.
+              <div className="mb-2">Make sure:</div>
+              <ul className="text-left list-disc list-inside space-y-1">
+                <li>The signaling server is running at <code className="bg-gray-700 px-1 py-0.5 rounded text-xs">{streamingUrl}</code></li>
+                <li>The mobile app is connected and streaming</li>
+                <li>Both devices are on the same network (or using TURN server)</li>
+              </ul>
             </div>
             <button
               onClick={initializeWebRTC}
@@ -449,4 +455,3 @@ export default function WebRTCViewer({
     </div>
   );
 }
-

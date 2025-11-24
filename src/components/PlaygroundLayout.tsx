@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
               <div className="flex-1 overflow-hidden">
                 <WebRTCViewer 
                   serverUrl="http://localhost:3000" 
-                  signalingUrl="ws://localhost:3002"
+                  signalingUrl="ws://localhost:3002" 
                   theme={currentSettings.theme} 
                 />
               </div>
