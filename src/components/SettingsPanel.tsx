@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 interface Settings {
   fontSize: number;
@@ -110,8 +112,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <button
                 onClick={() => setTheme('light')}
                 className={`relative rounded-lg overflow-hidden border-2 transition-all ${theme === 'light'
-                    ? 'border-blue-500 ring-2 ring-blue-500 ring-opacity-50'
-                    : 'border-[#3e3e42] hover:border-[#4e4e52]'
+                  ? 'border-blue-500 ring-2 ring-blue-500 ring-opacity-50'
+                  : 'border-[#3e3e42] hover:border-[#4e4e52]'
                   }`}
               >
                 <div className="aspect-video bg-white p-3">
@@ -139,8 +141,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <button
                 onClick={() => setTheme('dark')}
                 className={`relative rounded-lg overflow-hidden border-2 transition-all ${theme === 'dark'
-                    ? 'border-blue-500 ring-2 ring-blue-500 ring-opacity-50'
-                    : 'border-[#3e3e42] hover:border-[#4e4e52]'
+                  ? 'border-blue-500 ring-2 ring-blue-500 ring-opacity-50'
+                  : 'border-[#3e3e42] hover:border-[#4e4e52]'
                   }`}
               >
                 <div className="aspect-video bg-[#1e1e1e] p-3">

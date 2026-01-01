@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useMemo, useState } from 'react';
 
 export type LogLevel = 'log' | 'info' | 'warn' | 'error';
@@ -43,27 +45,19 @@ export default function ConsolePanel({
           <button className={tabStyles(tab === 'builder')} onClick={() => setTab('builder')}>BUILDER LOGS</button>
         </div>
         <div className="flex items-center gap-2">
-          <select
-            className="bg-[#1e1e1e] border border-[#3e3e42] rounded px-2 py-1 text-xs text-gray-300"
-            value={level}
-            onChange={e => setLevel(e.target.value as any)}
-          >
+          <select className="bg-[#1e1e1e] border border-[#3e3e42] rounded px-2 py-1 text-xs text-gray-300" value={level}
+            onChange={e => setLevel(e.target.value as any)}>
             <option value="all">All</option>
             <option value="log">Log</option>
             <option value="info">Info</option>
             <option value="warn">Warn</option>
             <option value="error">Error</option>
           </select>
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
+          <input value={query} onChange={e => setQuery(e.target.value)}
             placeholder="Filter..."
-            className="bg-[#1e1e1e] border border-[#3e3e42] rounded px-2 py-1 text-xs text-gray-300 w-40"
-          />
-          <button
-            className="text-red-400 hover:text-red-500 text-xs"
-            onClick={() => (tab === 'console' ? onClearLogs() : onClearBuilderLogs())}
-          >
+            className="bg-[#1e1e1e] border border-[#3e3e42] rounded px-2 py-1 text-xs text-gray-300 w-40" />
+          <button className="text-red-400 hover:text-red-500 text-xs"
+            onClick={() => (tab === 'console' ? onClearLogs() : onClearBuilderLogs())} >
             Clear
           </button>
         </div>

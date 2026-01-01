@@ -5,36 +5,29 @@ import Editor, { OnMount } from '@monaco-editor/react';
 import { Settings } from './SettingsPanel';
 import type { editor } from 'monaco-editor';
 
-interface MonacoPlaygroundProps {
+export interface MonacoPlaygroundProps {
   value: string;
   onChange: (value: string) => void;
   settings: Settings;
   language?: string;
+  dependencies?: Record<string, string>;
 }
 
 export const MonacoPlayground: React.FC<MonacoPlaygroundProps> = ({
   value,
   onChange,
   settings,
-  language = 'typescript'
+  language = 'typescript',
+  dependencies = {}
 }) => {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<any>(null);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
-    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-      target: monaco.languages.typescript.ScriptTarget.ES2020,
-      allowNonTsExtensions: true,
-      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-      module: monaco.languages.typescript.ModuleKind.ESNext,
-      noEmit: true,
-      esModuleInterop: true,
-      jsx: monaco.languages.typescript.JsxEmit.React,
-      allowJs: true,
-      typeRoots: ['node_modules/@types'],
-    });
+    monacoRef.current = monaco;
 
-    monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
       target: monaco.languages.typescript.ScriptTarget.ES2020,
       allowNonTsExtensions: true,
       moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
@@ -118,6 +111,30 @@ export const MonacoPlayground: React.FC<MonacoPlaygroundProps> = ({
       noSyntaxValidation: false,
     });
   };
+
+  React.useEffect(() => {
+    const fetchTypes = async () => {
+      if (!monacoRef.current) return;
+
+      for (const [name, version] of Object.entries(dependencies)) {
+        try {
+          const response = await fetch(`https://esm.sh/${name}@${version}`);
+          const content = await response.text();
+          monacoRef.current.languages.typescript.typescriptDefaults.addExtraLib(
+            `declare module '${name}';`,
+            `file:///node_modules/@types/${name}/index.d.ts`
+          );
+          console.log(`Types injected for ${name}`);
+        } catch (e) {
+          console.error(`Failed to fetch types for ${name}`, e);
+        }
+      }
+    };
+
+    if (Object.keys(dependencies).length > 0) {
+      fetchTypes();
+    }
+  }, [dependencies]);
 
   return (
     <Editor
