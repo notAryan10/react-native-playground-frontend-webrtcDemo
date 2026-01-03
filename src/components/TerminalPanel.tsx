@@ -16,122 +16,150 @@ export default function TerminalPanel({ height = 300 }: TerminalPanelProps) {
     useEffect(() => {
         if (!terminalRef.current) return;
 
-        let term: any;
-        let ws: WebSocket;
-        let fitAddon: any;
-        let handleResize: (() => void) | null = null;
+        let isMounted = true;
+        let cleanupFn: (() => void) | undefined;
 
         const initTerminal = async () => {
-            await import('xterm/css/xterm.css');
+            try {
+                await import('xterm/css/xterm.css');
+                if (!isMounted) return;
 
-            const { Terminal } = await import('xterm');
-            const { FitAddon } = await import('xterm-addon-fit');
+                const { Terminal } = await import('xterm');
+                const { FitAddon } = await import('xterm-addon-fit');
+                if (!isMounted) return;
 
-            term = new Terminal({
-                cursorBlink: true,
-                fontSize: 14,
-                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-                theme: {
-                    background: '#1e1e1e',
-                    foreground: '#d4d4d4',
-                    cursor: '#ffffff',
-                },
-                rows: 20,
-            });
+                const term = new Terminal({
+                    cursorBlink: true,
+                    fontSize: 14,
+                    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+                    theme: {
+                        background: '#1e1e1e',
+                        foreground: '#d4d4d4',
+                        cursor: '#ffffff',
+                    },
+                    scrollback: 5000,
+                    allowProposedApi: true
+                });
 
-            fitAddon = new FitAddon();
-            term.loadAddon(fitAddon);
+                const fitAddon = new FitAddon();
+                term.loadAddon(fitAddon);
 
-            if (!terminalRef.current) return;
-            term.open(terminalRef.current);
-            fitAddon.fit();
-
-            xtermRef.current = term;
-            fitAddonRef.current = fitAddon;
-
-
-            let retryTimeout: NodeJS.Timeout;
-            let isUnmounted = false;
-
-            const connect = () => {
-                if (isUnmounted) return;
-
-                if (wsRef.current) {
-                    wsRef.current.close();
-                    wsRef.current = null;
+                if (terminalRef.current) {
+                    term.open(terminalRef.current);
+                    setTimeout(() => {
+                        try {
+                            fitAddon.fit();
+                        } catch (e) {
+                            console.error('Fit error:', e);
+                        }
+                    }, 50);
                 }
 
-                ws = new WebSocket('ws://localhost:3000/terminal');
-                wsRef.current = ws;
+                xtermRef.current = term;
+                fitAddonRef.current = fitAddon;
 
-                ws.onopen = () => {
-                    setIsConnected(true);
-                    term.writeln('\\x1b[32m✓ Terminal connected\\x1b[0m');
-                    term.writeln('Type commands and press Enter...');
-                    term.write('\\r\\n$ ');
-                };
+                let retryTimeout: NodeJS.Timeout;
+                let ws: WebSocket | null = null;
 
-                ws.onmessage = (event: MessageEvent) => {
-                    term.write(event.data);
-                };
+                const connect = () => {
+                    if (!isMounted) return;
 
-                ws.onerror = () => {
-                    if (!isUnmounted) {
-                        term.writeln('\\r\\n\\x1b[31m✗ Connection error, retrying in 3s...\\x1b[0m');
-                        setIsConnected(false);
+                    if (wsRef.current) {
+                        try {
+                            wsRef.current.close();
+                        } catch (e) {
+                        }
+                        wsRef.current = null;
                     }
-                };
 
-                ws.onclose = () => {
-                    if (!isUnmounted) {
-                        term.writeln('\\r\\n\\x1b[33m⚠ Connection closed, retrying in 3s...\\x1b[0m');
+                    ws = new WebSocket('ws://localhost:3000/terminal');
+                    wsRef.current = ws;
+
+                    ws.onopen = () => {
+                        if (!isMounted) {
+                            ws?.close();
+                            return;
+                        }
+                        setIsConnected(true);
+                        fitAddon.fit();
+                        term.writeln('\x1b[32m✓ Terminal connected\x1b[0m');
+                        term.writeln('Type commands and press Enter...');
+
+                        ws?.send(JSON.stringify({
+                            type: 'resize',
+                            cols: term.cols,
+                            rows: term.rows
+                        }));
+                    };
+
+                    ws.onmessage = (event: MessageEvent) => {
+                        if (!isMounted) return;
+                        term.write(event.data);
+                    };
+
+                    ws.onerror = () => {
+                        if (!isMounted) return;
+                        term.writeln('\r\n\x1b[31m✗ Connection error, retrying in 3s...\x1b[0m');
+                        setIsConnected(false);
+                    };
+
+                    ws.onclose = () => {
+                        if (!isMounted) return;
+                        term.writeln('\r\n\x1b[33m⚠ Connection closed, retrying in 3s...\x1b[0m');
                         setIsConnected(false);
                         retryTimeout = setTimeout(connect, 3000);
-                    }
+                    };
                 };
-            };
 
-            connect();
+                connect();
 
-            term.onData((data: string) => {
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(JSON.stringify({ type: 'input', data }));
-                }
-            });
+                term.onData((data: string) => {
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(JSON.stringify({ type: 'input', data }));
+                    }
+                });
 
-            handleResize = () => {
-                fitAddon.fit();
-                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                    wsRef.current.send(JSON.stringify({
-                        type: 'resize',
-                        cols: term.cols,
-                        rows: term.rows,
-                    }));
+                const handleResize = () => {
+                    if (!isMounted) return
+                    try {
+                        fitAddon.fit()
+                        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                            wsRef.current.send(JSON.stringify({
+                                type: 'resize',
+                                cols: term.cols,
+                                rows: term.rows,
+                            }))
+                        }
+                    } catch (err) {
+                        console.error('Resize error:', err)
+                    }
                 }
-            };
 
-            window.addEventListener('resize', handleResize);
+                window.addEventListener('resize', handleResize)
 
-            return () => {
-                isUnmounted = true;
-                clearTimeout(retryTimeout);
-                if (handleResize) {
-                    window.removeEventListener('resize', handleResize);
-                }
-                if (wsRef.current) {
-                    wsRef.current.close();
-                }
-                if (xtermRef.current) {
-                    xtermRef.current.dispose();
-                }
-            };
+                cleanupFn = () => {
+                    clearTimeout(retryTimeout)
+                    window.removeEventListener('resize', handleResize)
+                    if (wsRef.current) {
+                        wsRef.current.close()
+                        wsRef.current = null
+                    }
+                    term.dispose()
+                    xtermRef.current = null
+                };
+
+            } catch (err) {
+                console.error('Failed to init terminal:', err)
+            }
         };
 
-        let cleanup: (() => void) | undefined;
-        initTerminal().then(c => { cleanup = c; });
+        initTerminal()
 
         return () => {
-            if (cleanup) cleanup()
+            isMounted = false
+            if (cleanupFn) {
+                cleanupFn()
+            }
         }
     }, [])
 
@@ -159,7 +187,9 @@ export default function TerminalPanel({ height = 300 }: TerminalPanelProps) {
                     {isConnected ? 'Connected' : 'Disconnected'}
                 </span>
             </div>
-            <div ref={terminalRef} style={{ flex: 1, padding: '8px' }} />
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+                <div ref={terminalRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '80px', padding: '8px' }} />
+            </div>
         </div>
     );
 }
