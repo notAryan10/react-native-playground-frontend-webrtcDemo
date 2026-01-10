@@ -182,7 +182,9 @@ export default function PlaygroundLayout() {
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3002');
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+    const wsUrl = backendUrl.replace(/^http/, 'ws');
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -313,7 +315,9 @@ export default function PlaygroundLayout() {
                 </div>
               </div>
               <div className="flex-1 overflow-hidden">
-                <WebRTCViewer signalingUrl="ws://localhost:3002" />
+                <WebRTCViewer signalingUrl={
+                  (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000').replace(/^http/, 'ws')
+                } />
               </div>
 
               <div style={{ height: '30%', display: 'flex', flexDirection: 'column', borderTop: `1px solid ${themeColors.border} ` }}>

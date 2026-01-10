@@ -8,9 +8,9 @@ interface StreamViewerProps {
   theme?: 'dark' | 'light';
 }
 
-export default function StreamViewer({ 
-  serverUrl = 'http://localhost:3000', 
-  theme = 'dark' 
+export default function StreamViewer({
+  serverUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000',
+  theme = 'dark'
 }: StreamViewerProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +92,7 @@ export default function StreamViewer({
   }, []);
 
   return (
-    <div 
+    <div
       className="h-full flex flex-col"
       style={{ backgroundColor: themeColors.bg }}
     >
@@ -114,7 +114,7 @@ export default function StreamViewer({
             ) : (
               <WifiOff className="w-4 h-4 text-red-500" />
             )}
-            <span 
+            <span
               className="text-xs"
               style={{ color: isConnected ? '#10b981' : '#ef4444' }}
             >
@@ -142,13 +142,13 @@ export default function StreamViewer({
       <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
         {error ? (
           <div className="text-center">
-            <div 
+            <div
               className="text-sm mb-2"
               style={{ color: themeColors.textSecondary }}
             >
               {error}
             </div>
-            <div 
+            <div
               className="text-xs"
               style={{ color: themeColors.textSecondary }}
             >
@@ -219,7 +219,7 @@ export default function StreamViewer({
           borderColor: themeColors.border
         }}
       >
-        <label 
+        <label
           className="text-xs font-medium mb-2 block"
           style={{ color: themeColors.textSecondary }}
         >

@@ -72,7 +72,9 @@ export default function TerminalPanel({ height = 300 }: TerminalPanelProps) {
                         wsRef.current = null;
                     }
 
-                    ws = new WebSocket('ws://localhost:3000/terminal');
+                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+                    const wsUrl = backendUrl.replace(/^http/, 'ws');
+                    ws = new WebSocket(`${wsUrl}/terminal`);
                     wsRef.current = ws;
 
                     ws.onopen = () => {
