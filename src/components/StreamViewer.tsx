@@ -94,16 +94,9 @@ export default function StreamViewer({
   return (
     <div
       className="h-full flex flex-col"
-      style={{ backgroundColor: themeColors.bg }}
-    >
-      {/* Header */}
-      <div
-        className="px-4 py-3 flex items-center justify-between border-b"
-        style={{
-          backgroundColor: themeColors.bgSecondary,
-          borderColor: themeColors.border
-        }}
-      >
+      style={{ backgroundColor: themeColors.bg }}>
+      <div className="px-4 py-3 flex items-center justify-between border-b"
+        style={{ backgroundColor: themeColors.bgSecondary, borderColor: themeColors.border }}>
         <div className="flex items-center gap-3">
           <h3 className="font-semibold text-sm" style={{ color: themeColors.text }}>
             Live Stream Preview
