@@ -31,6 +31,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "white"
   },
   text: {
     fontSize: 24,
@@ -228,7 +229,7 @@ export default function PlaygroundLayout() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       sendCodeUpdate();
-    }, 500);
+    }, 100);
     return () => clearTimeout(timeoutId);
   }, [files]);
 
