@@ -229,7 +229,7 @@ export default function PlaygroundLayout() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       sendCodeUpdate();
-    }, 100);
+    }, 500);
     return () => clearTimeout(timeoutId);
   }, [files]);
 
