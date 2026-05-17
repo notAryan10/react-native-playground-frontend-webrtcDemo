@@ -292,6 +292,11 @@ export default function PlaygroundLayout() {
           </button>
           <div className="h-6 w-px" style={{ backgroundColor: themeColors.border }}></div>
           <h1 className="text-sm font-medium">React Native Playground</h1>
+          <div className="h-6 w-px" style={{ backgroundColor: themeColors.border }}></div>
+          <div className="flex items-center gap-2 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20">
+            <span className="text-[10px] uppercase tracking-wider font-bold text-blue-500">Workspace ID:</span>
+            <span className="text-xs font-mono text-blue-400">{userId}</span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {currentSettings.autoSave && lastSaved && (
