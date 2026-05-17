@@ -46,11 +46,10 @@ export default function PlaygroundLayout() {
   const [userId, setUserId] = useState<string>('');
   const [showPairingModal, setShowPairingModal] = useState(false);
 
-  // The Orchestrator URL: 
+  // The Orchestrator URL:
   // 1. First choice: Environment Variable (set this in Vercel!)
   // 2. Fallback: Localhost (for development)
   const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000';
-
   useEffect(() => {
     const savedId = localStorage.getItem('playground-user-id');
     if (savedId) {

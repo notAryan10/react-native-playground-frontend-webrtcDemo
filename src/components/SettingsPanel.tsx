@@ -115,11 +115,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <input
               type="text"
               className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
-              placeholder="http://3.90.161.146:4000"
+              placeholder="https://api.yourdomain.com"
               value={orchestratorUrl}
               onChange={(e) => setOrchestratorUrl(e.target.value)}
-            />
-            <p className="text-xs text-gray-500">
+            />            <p className="text-xs text-gray-500">
               This URL will be encoded in the QR code for mobile pairing. If empty, it defaults to the local server.
             </p>
           </div>
