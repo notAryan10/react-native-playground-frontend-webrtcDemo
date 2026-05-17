@@ -42,21 +42,25 @@ const styles = StyleSheet.create({
 export default function PlaygroundLayout() {
   const [workspaceStatus, setWorkspaceStatus] = useState<'idle' | 'provisioning' | 'ready' | 'error'>('idle');
   const [workspaceUrl, setWorkspaceUrl] = useState<string | null>(null);
-  const [userId] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedId = localStorage.getItem('playground-user-id');
-      if (savedId) return savedId;
+  const [userId, setUserId] = useState<string>('');
+
+  useEffect(() => {
+    const savedId = localStorage.getItem('playground-user-id');
+    if (savedId) {
+      setUserId(savedId);
+    } else {
       const newId = `user-${Math.random().toString(36).substr(2, 9)}`;
       localStorage.setItem('playground-user-id', newId);
-      return newId;
+      setUserId(newId);
     }
-    return 'default-user';
-  });
+  }, []);
 
   const [showSettings, setShowSettings] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'terminal'>('console');
   
   useEffect(() => {
+    if (!userId) return;
+
     const provisionWorkspace = async () => {
       setWorkspaceStatus('provisioning');
       try {
