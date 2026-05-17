@@ -59,6 +59,8 @@ export default function PlaygroundLayout() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'terminal'>('console');
+
+  const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000';
   
   useEffect(() => {
     if (!userId) return;
@@ -66,7 +68,6 @@ export default function PlaygroundLayout() {
     const provisionWorkspace = async () => {
       setWorkspaceStatus('provisioning');
       try {
-        const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000';
         const res = await fetch(`${orchestratorUrl}/workspaces`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -454,7 +455,7 @@ export default function PlaygroundLayout() {
             <div className="p-4 bg-white rounded-lg border-4 border-blue-500/10">
               <QRCodeSVG 
                 value={JSON.stringify({ 
-                  url: process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000', 
+                  url: orchestratorUrl, 
                   id: userId 
                 })} 
                 size={200}
