@@ -4,9 +4,10 @@ import React, { useEffect, useRef, useState } from 'react';
 
 interface TerminalPanelProps {
     height?: number;
+    terminalUrl?: string;
 }
 
-export default function TerminalPanel({ height = 300 }: TerminalPanelProps) {
+export default function TerminalPanel({ height = 300, terminalUrl }: TerminalPanelProps) {
     const terminalRef = useRef<HTMLDivElement>(null);
     const xtermRef = useRef<any>(null);
     const wsRef = useRef<WebSocket | null>(null);
@@ -72,8 +73,12 @@ export default function TerminalPanel({ height = 300 }: TerminalPanelProps) {
                         wsRef.current = null;
                     }
 
-                    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-                    const wsUrl = backendUrl.replace(/^http/, 'ws');
+                    if (!terminalUrl) {
+                        term.writeln('\x1b[33mWaiting for terminal URL...\x1b[0m');
+                        return;
+                    }
+
+                    const wsUrl = terminalUrl.endsWith('/') ? terminalUrl.slice(0, -1) : terminalUrl;
                     ws = new WebSocket(`${wsUrl}/terminal`);
                     wsRef.current = ws;
 
@@ -163,7 +168,7 @@ export default function TerminalPanel({ height = 300 }: TerminalPanelProps) {
                 cleanupFn()
             }
         }
-    }, [])
+    }, [terminalUrl])
 
     return (
         <div style={{ height, display: 'flex', flexDirection: 'column', backgroundColor: '#1e1e1e' }}>

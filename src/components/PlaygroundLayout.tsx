@@ -40,8 +40,47 @@ const styles = StyleSheet.create({
 `
 
 export default function PlaygroundLayout() {
+  const [workspaceStatus, setWorkspaceStatus] = useState<'idle' | 'provisioning' | 'ready' | 'error'>('idle');
+  const [workspaceUrl, setWorkspaceUrl] = useState<string | null>(null);
+  const [userId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedId = localStorage.getItem('playground-user-id');
+      if (savedId) return savedId;
+      const newId = `user-${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('playground-user-id', newId);
+      return newId;
+    }
+    return 'default-user';
+  });
+
   const [showSettings, setShowSettings] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'terminal'>('console');
+  
+  useEffect(() => {
+    const provisionWorkspace = async () => {
+      setWorkspaceStatus('provisioning');
+      try {
+        const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000';
+        const res = await fetch(`${orchestratorUrl}/workspaces`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        const data = await res.json();
+        if (data.status === 'ready') {
+          setWorkspaceUrl(data.url);
+          setWorkspaceStatus('ready');
+        } else {
+          setWorkspaceStatus('error');
+        }
+      } catch (e) {
+        console.error('Provisioning error:', e);
+        setWorkspaceStatus('error');
+      }
+    };
+    provisionWorkspace();
+  }, [userId]);
+
   const [currentSettings, setCurrentSettings] = useState<Settings>({
     fontSize: 14,
     theme: 'dark',
@@ -70,10 +109,10 @@ export default function PlaygroundLayout() {
   const [builderLogs, setBuilderLogs] = useState<LogEntry[]>([]);
 
   const pushLog = (level: LogLevel, message: string) => {
-    setLogs(prev => [...prev, { level, message, timestamp: new Date() }]);
+    setLogs((prev: any) => [...prev, { level, message, timestamp: new Date() }]);
   };
   const pushBuilderLog = (level: LogLevel, message: string) => {
-    setBuilderLogs(prev => [...prev, { level, message, timestamp: new Date() }]);
+    setBuilderLogs((prev: any) => [...prev, { level, message, timestamp: new Date() }]);
   };
 
   useEffect(() => {
@@ -146,7 +185,7 @@ export default function PlaygroundLayout() {
       content: '// New file\n',
       language: name.endsWith('.json') ? 'json' : (name.endsWith('.md') ? 'markdown' : (name.endsWith('.html') ? 'html' : 'typescript'))
     };
-    setFiles(prev => ({ ...prev, [path]: newFile }));
+    setFiles((prev: any) => ({ ...prev, [path]: newFile }));
     setActiveFile(path);
   };
 
@@ -162,14 +201,14 @@ export default function PlaygroundLayout() {
   };
 
   const handleCodeChange = (newContent: string) => {
-    setFiles(prev => ({
+    setFiles((prev: { [x: string]: any; }) => ({
       ...prev,
       [activeFile]: { ...prev[activeFile], content: newContent }
     }));
   };
 
   const handleAddDependency = (name: string, version: string) => {
-    setDependencies(prev => ({ ...prev, [name]: version }));
+    setDependencies((prev: any) => ({ ...prev, [name]: version }));
     pushBuilderLog('info', `Added dependency: ${name} @${version} `);
   };
 
@@ -183,9 +222,9 @@ export default function PlaygroundLayout() {
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
-    const wsUrl = backendUrl.replace(/^http/, 'ws');
-    const ws = new WebSocket(wsUrl);
+    if (!workspaceUrl) return;
+
+    const ws = new WebSocket(workspaceUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -201,7 +240,7 @@ export default function PlaygroundLayout() {
     return () => {
       ws.close();
     };
-  }, []);
+  }, [workspaceUrl]);
 
   const sendCodeUpdate = () => {
     const ws = wsRef.current;
@@ -316,9 +355,7 @@ export default function PlaygroundLayout() {
                 </div>
               </div>
               <div className="flex-1 overflow-hidden">
-                <WebRTCViewer signalingUrl={
-                  (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000').replace(/^http/, 'ws')
-                } />
+                <WebRTCViewer signalingUrl={workspaceUrl || ''} />
               </div>
 
               <div style={{ height: '30%', display: 'flex', flexDirection: 'column', borderTop: `1px solid ${themeColors.border} ` }}>
@@ -368,7 +405,7 @@ export default function PlaygroundLayout() {
                       onClearBuilderLogs={() => setBuilderLogs([])}
                     />
                   ) : (
-                    <TerminalPanel />
+                    <TerminalPanel terminalUrl={workspaceUrl || undefined} />
                   )}
                 </div>
               </div>
@@ -382,6 +419,22 @@ export default function PlaygroundLayout() {
         initialSettings={currentSettings}
         onSave={handleSaveSettings}
       />
+      {workspaceStatus !== 'ready' && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-white font-medium text-lg">
+            {workspaceStatus === 'provisioning' ? 'Provisioning your private workspace...' : 'Failed to start workspace.'}
+          </p>
+          {workspaceStatus === 'error' && (
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -13,6 +13,8 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   const [status, setStatus] = useState('idle');
 
   useEffect(() => {
+    if (!signalingUrl) return;
+
     const ws = new WebSocket(signalingUrl);
     wsRef.current = ws;
 
@@ -69,7 +71,7 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
     };
 
     return () => ws.close();
-  }, []);
+  }, [signalingUrl]);
 
   return (
     <div style={{ background: '#000', padding: 20 }}>
