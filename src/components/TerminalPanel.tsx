@@ -3,11 +3,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 interface TerminalPanelProps {
-    height?: number;
+    height?: number | string;
     terminalUrl?: string;
 }
 
-export default function TerminalPanel({ height = 300, terminalUrl }: TerminalPanelProps) {
+export default function TerminalPanel({ height = '100%', terminalUrl }: TerminalPanelProps) {
     const terminalRef = useRef<HTMLDivElement>(null);
     const xtermRef = useRef<any>(null);
     const wsRef = useRef<WebSocket | null>(null);
@@ -194,8 +194,8 @@ export default function TerminalPanel({ height = 300, terminalUrl }: TerminalPan
                     {isConnected ? 'Connected' : 'Disconnected'}
                 </span>
             </div>
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-                <div ref={terminalRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '80px', padding: '8px' }} />
+            <div style={{ flex: 1, backgroundColor: '#1e1e1e', padding: '4px' }}>
+                <div ref={terminalRef} style={{ height: '100%', width: '100%' }} />
             </div>
         </div>
     );
