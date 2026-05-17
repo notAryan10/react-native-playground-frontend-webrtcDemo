@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { SettingsPanel, Settings } from './SettingsPanel';
 import ConsolePanel, { LogEntry, LogLevel } from './ConsolePanel';
-import { ArrowLeft, Clock, Download, Settings as SettingsIcon, HelpCircle, FileText } from 'lucide-react';
+import { ArrowLeft, Clock, Download, Settings as SettingsIcon, HelpCircle, FileText, Smartphone } from 'lucide-react';
 import { WebRTCViewerProps } from './WebRTCViewer';
 import { MonacoPlaygroundProps } from './MonacoPlayground';
 import { FileExplorer, File } from './FileExplorer';
@@ -44,6 +44,7 @@ export default function PlaygroundLayout() {
   const [workspaceStatus, setWorkspaceStatus] = useState<'idle' | 'provisioning' | 'ready' | 'error'>('idle');
   const [workspaceUrl, setWorkspaceUrl] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>('');
+  const [showPairingModal, setShowPairingModal] = useState(false);
 
   useEffect(() => {
     const savedId = localStorage.getItem('playground-user-id');
@@ -298,23 +299,14 @@ export default function PlaygroundLayout() {
           <div className="h-6 w-px" style={{ backgroundColor: themeColors.border }}></div>
           <h1 className="text-sm font-medium">React Native Playground</h1>
           <div className="h-6 w-px" style={{ backgroundColor: themeColors.border }}></div>
-          <div className="group relative flex items-center gap-2 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20 cursor-help">
-            <span className="text-[10px] uppercase tracking-wider font-bold text-blue-500">Workspace ID:</span>
-            <span className="text-xs font-mono text-blue-400">{userId}</span>
-            
-            {/* QR Code Hover Menu */}
-            <div className="absolute top-full left-0 mt-2 p-4 bg-white rounded-lg shadow-2xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100] flex flex-col items-center gap-3">
-              <span className="text-xs font-bold text-gray-800">Scan to pair mobile:</span>
-              <QRCodeSVG 
-                value={JSON.stringify({ 
-                  url: process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000', 
-                  id: userId 
-                })} 
-                size={140}
-              />
-              <span className="text-[9px] text-gray-400 text-center w-32">Open the mobile app and tap "Scan QR"</span>
-            </div>
-          </div>
+          
+          <button 
+            onClick={() => setShowPairingModal(true)}
+            className="flex items-center gap-2 px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 transition-colors text-white"
+          >
+            <Smartphone className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-tight">Pair Mobile</span>
+          </button>
         </div>
         <div className="flex items-center gap-3">
           {currentSettings.autoSave && lastSaved && (
@@ -442,6 +434,53 @@ export default function PlaygroundLayout() {
         initialSettings={currentSettings}
         onSave={handleSaveSettings}
       />
+      
+      {/* Pairing Modal */}
+      {showPairingModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-sm w-full flex flex-col items-center gap-6 relative">
+            <button 
+              onClick={() => setShowPairingModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1"
+            >
+              <ArrowLeft className="w-5 h-5 rotate-90" />
+            </button>
+            
+            <div className="flex flex-col items-center gap-1">
+              <h2 className="text-xl font-bold text-gray-900">Pair your Mobile</h2>
+              <p className="text-sm text-gray-500 text-center">Scan this code to automatically connect your device</p>
+            </div>
+
+            <div className="p-4 bg-white rounded-lg border-4 border-blue-500/10">
+              <QRCodeSVG 
+                value={JSON.stringify({ 
+                  url: process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000', 
+                  id: userId 
+                })} 
+                size={200}
+              />
+            </div>
+
+            <div className="flex flex-col items-center gap-2 w-full">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 border border-gray-200 w-full justify-between">
+                <span className="text-[10px] uppercase font-bold text-gray-400">Workspace ID</span>
+                <span className="text-xs font-mono font-bold text-blue-600">{userId}</span>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-2 italic text-center">
+                Make sure your phone is using mobile data if your local Wi-Fi has a firewall.
+              </p>
+            </div>
+            
+            <button 
+              onClick={() => setShowPairingModal(false)}
+              className="w-full py-3 rounded-lg bg-gray-900 text-white font-bold text-sm hover:bg-black transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       {workspaceStatus !== 'ready' && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
