@@ -10,6 +10,7 @@ interface Settings {
   minimap: boolean;
   autoRefresh: boolean;
   showConsoleErrors: boolean;
+  orchestratorUrl: string;
 }
 
 interface SettingsPanelProps {
@@ -33,6 +34,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const [minimap, setMinimap] = useState<boolean>(initialSettings.minimap || false);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(initialSettings.autoRefresh !== undefined ? initialSettings.autoRefresh : true);
   const [showConsoleErrors, setShowConsoleErrors] = useState<boolean>(initialSettings.showConsoleErrors !== undefined ? initialSettings.showConsoleErrors : true);
+  const [orchestratorUrl, setOrchestratorUrl] = useState<string>(initialSettings.orchestratorUrl || '');
 
   const fontSizes = [12, 14, 16, 18, 20, 22];
 
@@ -45,7 +47,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       formatOnSave,
       minimap,
       autoRefresh,
-      showConsoleErrors
+      showConsoleErrors,
+      orchestratorUrl
     };
 
     if (onSave) {
@@ -103,6 +106,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </div>
+          </div>
+
+          <div className="space-y-4 pb-6 border-b border-[#3e3e42]">
+            <label className="block text-sm font-medium text-gray-300">
+              Orchestrator URL (AWS Public IP)
+            </label>
+            <input
+              type="text"
+              className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
+              placeholder="http://3.90.161.146:4000"
+              value={orchestratorUrl}
+              onChange={(e) => setOrchestratorUrl(e.target.value)}
+            />
+            <p className="text-xs text-gray-500">
+              This URL will be encoded in the QR code for mobile pairing. If empty, it defaults to the local server.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-3">
@@ -288,7 +307,8 @@ export default function SettingsPanelDemo() {
     formatOnSave: false,
     minimap: false,
     autoRefresh: true,
-    showConsoleErrors: true
+    showConsoleErrors: true,
+    orchestratorUrl: process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || '',
   });
 
   const handleSaveSettings = (newSettings: Settings) => {
