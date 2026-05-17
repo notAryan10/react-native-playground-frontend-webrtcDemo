@@ -11,6 +11,7 @@ import { MonacoPlaygroundProps } from './MonacoPlayground';
 import { FileExplorer, File } from './FileExplorer';
 import * as Babel from '@babel/standalone';
 import TerminalPanel from './TerminalPanel';
+import { QRCodeSVG } from 'qrcode.react';
 
 const MonacoPlayground = dynamic<MonacoPlaygroundProps>(() => import('./MonacoPlayground'), { ssr: false });
 const WebRTCViewer = dynamic<WebRTCViewerProps>(() => import('./WebRTCViewer'), { ssr: false });
@@ -297,9 +298,22 @@ export default function PlaygroundLayout() {
           <div className="h-6 w-px" style={{ backgroundColor: themeColors.border }}></div>
           <h1 className="text-sm font-medium">React Native Playground</h1>
           <div className="h-6 w-px" style={{ backgroundColor: themeColors.border }}></div>
-          <div className="flex items-center gap-2 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20">
+          <div className="group relative flex items-center gap-2 px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20 cursor-help">
             <span className="text-[10px] uppercase tracking-wider font-bold text-blue-500">Workspace ID:</span>
             <span className="text-xs font-mono text-blue-400">{userId}</span>
+            
+            {/* QR Code Hover Menu */}
+            <div className="absolute top-full left-0 mt-2 p-4 bg-white rounded-lg shadow-2xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[100] flex flex-col items-center gap-3">
+              <span className="text-xs font-bold text-gray-800">Scan to pair mobile:</span>
+              <QRCodeSVG 
+                value={JSON.stringify({ 
+                  url: process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000', 
+                  id: userId 
+                })} 
+                size={140}
+              />
+              <span className="text-[9px] text-gray-400 text-center w-32">Open the mobile app and tap "Scan QR"</span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3">
