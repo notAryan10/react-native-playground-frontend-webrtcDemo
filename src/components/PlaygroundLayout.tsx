@@ -139,6 +139,9 @@ export default function PlaygroundLayout() {
   }, [files, dependencies, currentSettings.autoSave]);
 
   useEffect(() => {
+    let finalFiles = files;
+    let finalDeps = dependencies;
+
     const savedFiles = localStorage.getItem('playground-files');
     if (savedFiles) {
       try {
@@ -156,10 +159,10 @@ export default function PlaygroundLayout() {
               migrated[key] = parsed[key];
             }
           });
-          setFiles(migrated);
+          finalFiles = migrated;
           setActiveFile('src/App.tsx');
         } else {
-          setFiles(parsed);
+          finalFiles = parsed;
         }
       } catch (e) {
         console.error('Failed to parse saved files', e);
@@ -167,7 +170,40 @@ export default function PlaygroundLayout() {
     }
 
     const savedDeps = localStorage.getItem('playground-deps');
-    if (savedDeps) setDependencies(JSON.parse(savedDeps));
+    if (savedDeps) {
+      try {
+        finalDeps = JSON.parse(savedDeps);
+        setDependencies(finalDeps);
+      } catch (e) {
+        console.error('Failed to parse saved dependencies', e);
+      }
+    }
+
+    // Sync package.json content with loaded dependencies
+    if (finalFiles['package.json']) {
+      try {
+        const pkg = JSON.parse(finalFiles['package.json'].content);
+        pkg.dependencies = {
+          ...(pkg.dependencies || {}),
+          ...finalDeps
+        };
+        // Clean up any leading spaces (like the one reported by the user)
+        const cleanDeps: Record<string, string> = {};
+        Object.entries(pkg.dependencies as Record<string, string>).forEach(([k, v]) => {
+          cleanDeps[k.trim()] = v;
+        });
+        pkg.dependencies = cleanDeps;
+        
+        finalFiles['package.json'] = {
+          ...finalFiles['package.json'],
+          content: JSON.stringify(pkg, null, 2)
+        };
+      } catch (e) {
+        console.error('Failed to sync package.json on load', e);
+      }
+    }
+
+    setFiles(finalFiles);
 
     const savedSettings = localStorage.getItem('playground-settings');
     if (savedSettings) setCurrentSettings(JSON.parse(savedSettings));
@@ -218,8 +254,9 @@ export default function PlaygroundLayout() {
   };
 
   const handleAddDependency = (name: string, version: string) => {
+    const cleanName = name.trim();
     setDependencies((prev: any) => {
-      const newDeps = { ...prev, [name]: version };
+      const newDeps = { ...prev, [cleanName]: version };
       
       // Also update package.json in files state for UI consistency
       setFiles(prevFiles => {
@@ -246,7 +283,7 @@ export default function PlaygroundLayout() {
       
       return newDeps;
     });
-    pushBuilderLog('info', `Added dependency: ${name} @${version} `);
+    pushBuilderLog('info', `Added dependency: ${cleanName} @${version} `);
   };
 
   const handleRemoveDependency = (name: string) => {
