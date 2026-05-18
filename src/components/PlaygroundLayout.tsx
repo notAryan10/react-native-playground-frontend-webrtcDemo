@@ -241,6 +241,7 @@ export default function PlaygroundLayout() {
       console.log('📝 Web Editor connected to signaling server');
       ws.send(JSON.stringify({ type: 'register', clientType: 'web' }));
       sendCodeUpdate();
+      sendFileSync();
     };
 
     ws.onclose = () => {
