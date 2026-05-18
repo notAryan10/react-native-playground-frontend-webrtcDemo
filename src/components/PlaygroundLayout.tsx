@@ -275,9 +275,21 @@ export default function PlaygroundLayout() {
     }
   };
 
+  const sendFileSync = () => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      console.log('Syncing files to workspace...');
+      ws.send(JSON.stringify({
+        type: 'file-update',
+        files: files
+      }));
+    }
+  };
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       sendCodeUpdate();
+      sendFileSync();
     }, 500);
     return () => clearTimeout(timeoutId);
   }, [files]);
