@@ -218,14 +218,66 @@ export default function PlaygroundLayout() {
   };
 
   const handleAddDependency = (name: string, version: string) => {
-    setDependencies((prev: any) => ({ ...prev, [name]: version }));
+    setDependencies((prev: any) => {
+      const newDeps = { ...prev, [name]: version };
+      
+      // Also update package.json in files state for UI consistency
+      setFiles(prevFiles => {
+        if (prevFiles['package.json']) {
+          try {
+            const pkg = JSON.parse(prevFiles['package.json'].content);
+            pkg.dependencies = {
+              ...(pkg.dependencies || {}),
+              ...newDeps
+            };
+            return {
+              ...prevFiles,
+              'package.json': {
+                ...prevFiles['package.json'],
+                content: JSON.stringify(pkg, null, 2)
+              }
+            };
+          } catch (e) {
+            console.error('Failed to update package.json file content', e);
+          }
+        }
+        return prevFiles;
+      });
+      
+      return newDeps;
+    });
     pushBuilderLog('info', `Added dependency: ${name} @${version} `);
   };
 
   const handleRemoveDependency = (name: string) => {
-    const newDeps = { ...dependencies };
-    delete newDeps[name];
-    setDependencies(newDeps);
+    setDependencies((prev: any) => {
+      const newDeps = { ...prev };
+      delete newDeps[name];
+
+      // Also update package.json in files state for UI consistency
+      setFiles(prevFiles => {
+        if (prevFiles['package.json']) {
+          try {
+            const pkg = JSON.parse(prevFiles['package.json'].content);
+            if (pkg.dependencies) {
+              delete pkg.dependencies[name];
+            }
+            return {
+              ...prevFiles,
+              'package.json': {
+                ...prevFiles['package.json'],
+                content: JSON.stringify(pkg, null, 2)
+              }
+            };
+          } catch (e) {
+            console.error('Failed to update package.json file content', e);
+          }
+        }
+        return prevFiles;
+      });
+
+      return newDeps;
+    });
     pushBuilderLog('info', `Removed dependency: ${name} `);
   };
 
@@ -280,9 +332,28 @@ export default function PlaygroundLayout() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       console.log('Syncing files to workspace...');
+      
+      // Inject dependencies into package.json
+      const updatedFiles = { ...files };
+      if (updatedFiles['package.json']) {
+        try {
+          const pkg = JSON.parse(updatedFiles['package.json'].content);
+          pkg.dependencies = {
+            ...(pkg.dependencies || {}),
+            ...dependencies
+          };
+          updatedFiles['package.json'] = {
+            ...updatedFiles['package.json'],
+            content: JSON.stringify(pkg, null, 2)
+          };
+        } catch (e) {
+          console.error('Failed to parse package.json for sync', e);
+        }
+      }
+
       ws.send(JSON.stringify({
         type: 'file-update',
-        files: files
+        files: updatedFiles
       }));
     }
   };
@@ -293,7 +364,7 @@ export default function PlaygroundLayout() {
       sendFileSync();
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [files]);
+  }, [files, dependencies]);
 
 
   const themeColors = currentSettings.theme === 'dark' ? {
