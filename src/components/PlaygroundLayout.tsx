@@ -51,7 +51,7 @@ export default function PlaygroundLayout() {
   // The Orchestrator URL:
   // 1. First choice: Environment Variable (set this in Vercel!)
   // 2. Fallback: Localhost (for development)
-  const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || 'http://localhost:4000';
+  const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || '';
   useEffect(() => {
     const savedId = localStorage.getItem('playground-user-id');
     if (savedId) {
@@ -650,7 +650,7 @@ export default function PlaygroundLayout() {
                 />
               ) : (
                 <QRCodeSVG 
-                  value="https://drive.google.com/file/d/19HOOvL-3mDbmzAi-P7ajEJYjK3MFfxID/view?usp=sharing" 
+                  value={process.env.NEXT_PUBLIC_APK_DOWNLOAD_URL || ""} 
                   size={200}
                 />
               )}
@@ -669,7 +669,7 @@ export default function PlaygroundLayout() {
                 <>
                   <p className="text-sm text-gray-500 text-center mb-2">Scan to download the Android APK</p>
                   <a 
-                    href="https://drive.google.com/file/d/19HOOvL-3mDbmzAi-P7ajEJYjK3MFfxID/view?usp=sharing"
+                    href={process.env.NEXT_PUBLIC_APK_DOWNLOAD_URL || "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors"

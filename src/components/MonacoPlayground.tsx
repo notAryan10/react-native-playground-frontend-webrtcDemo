@@ -118,7 +118,7 @@ export const MonacoPlayground: React.FC<MonacoPlaygroundProps> = ({
 
       for (const [name, version] of Object.entries(dependencies)) {
         try {
-          const response = await fetch(`https://esm.sh/${name}@${version}`);
+          const response = await fetch(`${process.env.NEXT_PUBLIC_ESM_SH || ''}/${name}@${version}`);
           const content = await response.text();
           monacoRef.current.languages.typescript.typescriptDefaults.addExtraLib(
             `declare module '${name}';`,

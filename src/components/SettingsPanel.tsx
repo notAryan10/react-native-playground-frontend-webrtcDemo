@@ -115,7 +115,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <input
               type="text"
               className="w-full bg-[#1e1e1e] border border-[#3e3e42] rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-blue-500 transition-colors"
-              placeholder="https://api.yourdomain.com"
+              placeholder="API URL"
               value={orchestratorUrl}
               onChange={(e) => setOrchestratorUrl(e.target.value)}
             />            <p className="text-xs text-gray-500">
