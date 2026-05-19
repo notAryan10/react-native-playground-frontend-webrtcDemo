@@ -361,7 +361,7 @@ export default function PlaygroundLayout() {
             if (!hasChanged) return prev;
             return newFiles;
           });
-          setTimeout(() => { isSyncingFromBackend.current = false; }, 100);
+          setTimeout(() => { isSyncingFromBackend.current = false; }, 5000);
         }
       } catch (e) {
         console.error('Error parsing signaling message', e);
