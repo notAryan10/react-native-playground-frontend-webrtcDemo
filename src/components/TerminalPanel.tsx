@@ -60,6 +60,27 @@ export default function TerminalPanel({ height = '100%', terminalUrl }: Terminal
                 xtermRef.current = term;
                 fitAddonRef.current = fitAddon;
 
+                // Handle resizing with ResizeObserver for better reliability in flex layouts
+                const resizeObserver = new ResizeObserver(() => {
+                    if (!isMounted) return;
+                    try {
+                        fitAddon.fit();
+                        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                            wsRef.current.send(JSON.stringify({
+                                type: 'resize',
+                                cols: term.cols,
+                                rows: term.rows,
+                            }));
+                        }
+                    } catch (err) {
+                        // Fit might fail if the element is not visible yet
+                    }
+                });
+
+                if (terminalRef.current) {
+                    resizeObserver.observe(terminalRef.current);
+                }
+
                 let retryTimeout: NodeJS.Timeout;
                 let ws: WebSocket | null = null;
 
@@ -127,27 +148,9 @@ export default function TerminalPanel({ height = '100%', terminalUrl }: Terminal
                     }
                 });
 
-                const handleResize = () => {
-                    if (!isMounted) return
-                    try {
-                        fitAddon.fit()
-                        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                            wsRef.current.send(JSON.stringify({
-                                type: 'resize',
-                                cols: term.cols,
-                                rows: term.rows,
-                            }))
-                        }
-                    } catch (err) {
-                        console.error('Resize error:', err)
-                    }
-                }
-
-                window.addEventListener('resize', handleResize)
-
                 cleanupFn = () => {
                     clearTimeout(retryTimeout)
-                    window.removeEventListener('resize', handleResize)
+                    resizeObserver.disconnect()
                     if (wsRef.current) {
                         wsRef.current.close()
                         wsRef.current = null
@@ -173,6 +176,14 @@ export default function TerminalPanel({ height = '100%', terminalUrl }: Terminal
 
     return (
         <div style={{ height, display: 'flex', flexDirection: 'column', backgroundColor: '#1e1e1e' }}>
+            <style dangerouslySetInnerHTML={{ __html: `
+                .xterm-viewport {
+                    overflow-y: auto !important;
+                }
+                .xterm-screen {
+                    height: 100% !important;
+                }
+            `}} />
             <div style={{
                 padding: '8px 12px',
                 backgroundColor: '#2d2d30',
