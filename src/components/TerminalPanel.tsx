@@ -39,7 +39,7 @@ export default function TerminalPanel({ height = '100%', terminalUrl }: Terminal
                         cursor: '#ffffff',
                     },
                     scrollback: 5000,
-                    scrollOnInput: true,
+                    scrollOnUserInput: true,
                     allowProposedApi: true
                 });
 
