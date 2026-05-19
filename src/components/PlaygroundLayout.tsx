@@ -400,27 +400,41 @@ export default function PlaygroundLayout() {
     }
   };
 
-  const sendFileSync = () => {
+  const sendFileSync = (specificFile?: string) => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      console.log('Syncing files to workspace...');
-      
-      // Inject dependencies into package.json
+      if (specificFile && files[specificFile]) {
+        console.log(`Syncing ${specificFile} to workspace...`);
+        const fileData = files[specificFile];
+        
+        // If syncing package.json, ensure dependencies are included
+        let content = fileData.content;
+        if (specificFile === 'package.json') {
+          try {
+            const pkg = JSON.parse(content);
+            pkg.dependencies = { ...(pkg.dependencies || {}), ...dependencies };
+            content = JSON.stringify(pkg, null, 2);
+          } catch (e) {}
+        }
+
+        ws.send(JSON.stringify({
+          type: 'file-update',
+          files: { [specificFile]: { ...fileData, content } }
+        }));
+        return;
+      }
+
+      console.log('Syncing all files to workspace...');
       const updatedFiles = { ...files };
       if (updatedFiles['package.json']) {
         try {
           const pkg = JSON.parse(updatedFiles['package.json'].content);
-          pkg.dependencies = {
-            ...(pkg.dependencies || {}),
-            ...dependencies
-          };
+          pkg.dependencies = { ...(pkg.dependencies || {}), ...dependencies };
           updatedFiles['package.json'] = {
             ...updatedFiles['package.json'],
             content: JSON.stringify(pkg, null, 2)
           };
-        } catch (e) {
-          console.error('Failed to parse package.json for sync', e);
-        }
+        } catch (e) {}
       }
 
       ws.send(JSON.stringify({
@@ -432,12 +446,22 @@ export default function PlaygroundLayout() {
 
   useEffect(() => {
     if (isSyncingFromBackend.current) return;
-    const timeoutId = setTimeout(() => {
+    
+    // Fast update for mobile preview
+    const codeTimeout = setTimeout(() => {
       sendCodeUpdate();
-      sendFileSync();
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [files, dependencies]);
+    }, 300);
+
+    // Slower update for disk persistence
+    const fileTimeout = setTimeout(() => {
+      sendFileSync(activeFile);
+    }, 1000);
+
+    return () => {
+      clearTimeout(codeTimeout);
+      clearTimeout(fileTimeout);
+    };
+  }, [files, dependencies, activeFile]);
 
 
   const themeColors = currentSettings.theme === 'dark' ? {
