@@ -98,11 +98,10 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     useEffect(() => {
         const timer = setTimeout(async () => {
             if (depQuery.length > 1) {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_NPMS_API || ''}?q=${depQuery}`);
-                const data = await res.json();
-                setDepSuggestions(data);
-            } else {
-
+                try {
+                    const res = await fetch(`${process.env.NEXT_PUBLIC_NPMS_API || ''}?q=${depQuery}`);
+                    const data = await res.json();
+                    setDepSuggestions(data);
                     setShowSuggestions(true);
                 } catch (e) {
                     console.error("Failed to fetch deps", e);
