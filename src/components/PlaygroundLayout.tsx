@@ -434,14 +434,10 @@ export default function PlaygroundLayout() {
           </button>
 
           <a 
-            href="#"
+            href="https://drive.google.com/file/d/19HOOvL-3mDbmzAi-P7ajEJYjK3MFfxID/view?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-2 px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors text-white"
-            onClick={(e) => {
-              if (e.currentTarget.getAttribute('href') === '#') {
-                e.preventDefault();
-                alert('APK download link coming soon!');
-              }
-            }}
           >
             <Download className="w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-tight">Get APK</span>
@@ -607,14 +603,10 @@ export default function PlaygroundLayout() {
               </div>
 
               <a 
-                href="#"
+                href="https://drive.google.com/file/d/19HOOvL-3mDbmzAi-P7ajEJYjK3MFfxID/view?usp=sharing"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors"
-                onClick={(e) => {
-                  if (e.currentTarget.getAttribute('href') === '#') {
-                    e.preventDefault();
-                    alert('APK download link coming soon!');
-                  }
-                }}
               >
                 <Download className="w-4 h-4" />
                 <span className="text-xs font-bold">Download Android APK</span>
