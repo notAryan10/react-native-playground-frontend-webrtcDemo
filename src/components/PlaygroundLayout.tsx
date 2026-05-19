@@ -45,6 +45,7 @@ export default function PlaygroundLayout() {
   const [workspaceUrl, setWorkspaceUrl] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [showPairingModal, setShowPairingModal] = useState(false);
+  const [pairingModalTab, setPairingModalTab] = useState<'pair' | 'download'>('pair');
 
   // The Orchestrator URL:
   // 1. First choice: Environment Variable (set this in Vercel!)
@@ -426,22 +427,26 @@ export default function PlaygroundLayout() {
           <div className="h-6 w-px" style={{ backgroundColor: themeColors.border }}></div>
           
           <button 
-            onClick={() => setShowPairingModal(true)}
+            onClick={() => {
+              setPairingModalTab('pair');
+              setShowPairingModal(true);
+            }}
             className="flex items-center gap-2 px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 transition-colors text-white"
           >
             <Smartphone className="w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-tight">Pair Mobile</span>
           </button>
 
-          <a 
-            href="https://drive.google.com/file/d/19HOOvL-3mDbmzAi-P7ajEJYjK3MFfxID/view?usp=sharing"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button 
+            onClick={() => {
+              setPairingModalTab('download');
+              setShowPairingModal(true);
+            }}
             className="flex items-center gap-2 px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors text-white"
           >
             <Download className="w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-tight">Get APK</span>
-          </a>
+          </button>
         </div>
         <div className="flex items-center gap-3">
           {currentSettings.autoSave && lastSaved && (
@@ -581,39 +586,69 @@ export default function PlaygroundLayout() {
               <ArrowLeft className="w-5 h-5 rotate-90" />
             </button>
             
-            <div className="flex flex-col items-center gap-1">
-              <h2 className="text-xl font-bold text-gray-900">Pair your Mobile</h2>
-              <p className="text-sm text-gray-500 text-center">Scan this code to automatically connect your device</p>
+            <div className="flex flex-col items-center gap-1 w-full">
+              <h2 className="text-xl font-bold text-gray-900">Mobile Setup</h2>
+              <div className="flex w-full bg-gray-100 rounded-lg p-1 mt-4">
+                <button 
+                  onClick={() => setPairingModalTab('pair')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${pairingModalTab === 'pair' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Pair Device
+                </button>
+                <button 
+                  onClick={() => setPairingModalTab('download')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${pairingModalTab === 'download' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Download App
+                </button>
+              </div>
             </div>
 
             <div className="p-4 bg-white rounded-lg border-4 border-blue-500/10">
-              <QRCodeSVG 
-                value={JSON.stringify({ 
-                  url: orchestratorUrl, 
-                  id: userId 
-                })} 
-                size={200}
-              />
+              {pairingModalTab === 'pair' ? (
+                <QRCodeSVG 
+                  value={JSON.stringify({ 
+                    url: orchestratorUrl, 
+                    id: userId 
+                  })} 
+                  size={200}
+                />
+              ) : (
+                <QRCodeSVG 
+                  value="https://drive.google.com/file/d/19HOOvL-3mDbmzAi-P7ajEJYjK3MFfxID/view?usp=sharing" 
+                  size={200}
+                />
+              )}
             </div>
 
             <div className="flex flex-col items-center gap-2 w-full">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 border border-gray-200 w-full justify-between">
-                <span className="text-[10px] uppercase font-bold text-gray-400">Workspace ID</span>
-                <span className="text-xs font-mono font-bold text-blue-600">{userId}</span>
-              </div>
+              {pairingModalTab === 'pair' ? (
+                <>
+                  <p className="text-sm text-gray-500 text-center mb-2">Scan to automatically connect your device</p>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 border border-gray-200 w-full justify-between">
+                    <span className="text-[10px] uppercase font-bold text-gray-400">Workspace ID</span>
+                    <span className="text-xs font-mono font-bold text-blue-600">{userId}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500 text-center mb-2">Scan to download the Android APK</p>
+                  <a 
+                    href="https://drive.google.com/file/d/19HOOvL-3mDbmzAi-P7ajEJYjK3MFfxID/view?usp=sharing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="text-xs font-bold">Open Download Link</span>
+                  </a>
+                </>
+              )}
 
-              <a 
-                href="https://drive.google.com/file/d/19HOOvL-3mDbmzAi-P7ajEJYjK3MFfxID/view?usp=sharing"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                <span className="text-xs font-bold">Download Android APK</span>
-              </a>
-
-              <p className="text-[10px] text-gray-400 mt-2 italic text-center">
-                Make sure your phone is using mobile data if your local Wi-Fi has a firewall.
+              <p className="text-[10px] text-gray-400 mt-4 italic text-center">
+                {pairingModalTab === 'pair' 
+                  ? "Make sure your phone is using mobile data if your local Wi-Fi has a firewall."
+                  : "Scanning will take you to Google Drive to download the latest APK."}
               </p>
             </div>
             
