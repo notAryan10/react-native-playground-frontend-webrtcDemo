@@ -47,6 +47,7 @@ export default function PlaygroundLayout() {
   const [showPairingModal, setShowPairingModal] = useState(false);
   const [pairingModalTab, setPairingModalTab] = useState<'pair' | 'download'>('pair');
   const isSyncingFromBackend = useRef(false);
+  const lastEditTime = useRef<number>(0);
 
   // The Orchestrator URL:
   // 1. First choice: Environment Variable (set this in Vercel!)
@@ -249,6 +250,7 @@ export default function PlaygroundLayout() {
   };
 
   const handleCodeChange = (newContent: string) => {
+    lastEditTime.current = Date.now();
     setFiles((prev: { [x: string]: any; }) => ({
       ...prev,
       [activeFile]: { ...prev[activeFile], content: newContent }
@@ -339,6 +341,13 @@ export default function PlaygroundLayout() {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'fs-sync') {
+          // If we edited locally in the last 4 seconds, ignore the backend sync
+          // to prevent "reverting" changes that haven't been saved to disk yet.
+          if (Date.now() - lastEditTime.current < 4000) {
+            console.log('Ignoring fs-sync due to recent local edit');
+            return;
+          }
+
           isSyncingFromBackend.current = true;
           setFiles(prev => {
             const newFiles = { ...data.files };
