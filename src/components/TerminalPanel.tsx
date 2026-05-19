@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import 'xterm/css/xterm.css';
 
 interface TerminalPanelProps {
     height?: number | string;
@@ -22,7 +23,6 @@ export default function TerminalPanel({ height = '100%', terminalUrl }: Terminal
 
         const initTerminal = async () => {
             try {
-                await import('xterm/css/xterm.css');
                 if (!isMounted) return;
 
                 const { Terminal } = await import('xterm');
@@ -39,6 +39,7 @@ export default function TerminalPanel({ height = '100%', terminalUrl }: Terminal
                         cursor: '#ffffff',
                     },
                     scrollback: 5000,
+                    scrollOnInput: true,
                     allowProposedApi: true
                 });
 
@@ -194,8 +195,8 @@ export default function TerminalPanel({ height = '100%', terminalUrl }: Terminal
                     {isConnected ? 'Connected' : 'Disconnected'}
                 </span>
             </div>
-            <div style={{ flex: 1, backgroundColor: '#1e1e1e', padding: '4px' }}>
-                <div ref={terminalRef} style={{ height: '100%', width: '100%' }} />
+            <div style={{ flex: 1, position: 'relative', backgroundColor: '#1e1e1e', overflow: 'hidden' }}>
+                <div ref={terminalRef} style={{ position: 'absolute', top: '4px', left: '4px', right: '4px', bottom: '4px' }} />
             </div>
         </div>
     );
