@@ -32,6 +32,7 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
 
       if (msg.type === 'offer') {
         setStatus('offer-received');
+        const fromId = msg.fromId;
 
         const pc = new RTCPeerConnection({
           iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -49,6 +50,7 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
             ws.send(JSON.stringify({
               type: 'ice-candidate',
               candidate: e.candidate,
+              targetId: fromId
             }));
           }
         };
@@ -60,6 +62,7 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
         ws.send(JSON.stringify({
           type: 'answer',
           answer,
+          targetId: fromId
         }));
 
         setStatus('connected');
