@@ -82,7 +82,15 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     onRemoveDependency
 }) => {
     const [fileTree, setFileTree] = useState<FileNode[]>([]);
-    const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({ 'src': true, 'public': true });
+    const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
+        'src': true,
+        'src/components': true,
+        'src/screens': true,
+        'src/hooks': false,
+        'src/utils': false,
+        'src/constants': false,
+        'public': false,
+    });
     const [isCreating, setIsCreating] = useState<'file' | 'folder' | null>(null);
     const [newItemName, setNewItemName] = useState('');
     const [selectedFolder, setSelectedFolder] = useState<string>(''); 
@@ -168,7 +176,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
 
                     <span className="truncate flex-1">{node.name}</span>
 
-                    {node.type === 'file' && node.name !== 'App.tsx' && (
+                    {node.type === 'file' && node.path !== 'src/App.tsx' && node.path !== 'package.json' && (
                         <button onClick={(e) => { e.stopPropagation(); onDeleteFile(node.path); }}
                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 text-red-500 rounded mr-1">
                             <Trash2 size={12} />

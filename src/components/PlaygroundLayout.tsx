@@ -38,7 +38,169 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
 });
-`
+`;
+
+const DEFAULT_FILES: Record<string, { name: string; content: string; language: string }> = {
+  'src/App.tsx': {
+    name: 'App.tsx',
+    content: DEFAULT_APP_CODE,
+    language: 'typescript',
+  },
+  'src/components/Button.tsx': {
+    name: 'Button.tsx',
+    content: `import React from "react";
+import { Pressable, Text, StyleSheet } from "react-native";
+
+interface ButtonProps {
+  title: string;
+  onPress: () => void;
+  color?: string;
+}
+
+export default function Button({ title, onPress, color = "#007aff" }: ButtonProps) {
+  return (
+    <Pressable onPress={onPress} style={[styles.button, { backgroundColor: color }]}>
+      <Text style={styles.label}>{title}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  button: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  label: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});
+`,
+    language: 'typescript',
+  },
+  'src/screens/HomeScreen.tsx': {
+    name: 'HomeScreen.tsx',
+    content: `import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+
+export default function HomeScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Home Screen</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+});
+`,
+    language: 'typescript',
+  },
+  'src/hooks/useCounter.ts': {
+    name: 'useCounter.ts',
+    content: `import { useState } from "react";
+
+export function useCounter(initial = 0) {
+  const [count, setCount] = useState(initial);
+  const increment = () => setCount((c) => c + 1);
+  const decrement = () => setCount((c) => c - 1);
+  const reset = () => setCount(initial);
+  return { count, increment, decrement, reset };
+}
+`,
+    language: 'typescript',
+  },
+  'src/utils/helpers.ts': {
+    name: 'helpers.ts',
+    content: `export function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+`,
+    language: 'typescript',
+  },
+  'src/constants/theme.ts': {
+    name: 'theme.ts',
+    content: `export const colors = {
+  primary: "#007aff",
+  secondary: "#5856d6",
+  success: "#34c759",
+  danger: "#ff3b30",
+  warning: "#ff9500",
+  background: "#ffffff",
+  surface: "#f2f2f7",
+  text: "#000000",
+  textSecondary: "#6c6c70",
+  border: "#c6c6c8",
+};
+
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+};
+
+export const fontSize = {
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 20,
+  xl: 24,
+  xxl: 32,
+};
+`,
+    language: 'typescript',
+  },
+  'package.json': {
+    name: 'package.json',
+    content: '{\n  "name": "my-app",\n  "version": "1.0.0",\n  "dependencies": {}\n}',
+    language: 'json',
+  },
+  'README.md': {
+    name: 'README.md',
+    content: `# My App
+
+Edit \`src/App.tsx\` to see changes live on your device.
+
+## Structure
+
+\`\`\`
+src/
+├── App.tsx          # Entry point (this is what runs)
+├── components/      # Reusable UI components
+├── screens/         # Screen-level components
+├── hooks/           # Custom React hooks
+├── utils/           # Helper functions
+└── constants/       # Theme, colors, config
+\`\`\`
+
+> Note: Only src/App.tsx is executed. Import other files by copying their code into App.tsx for now.
+`,
+    language: 'markdown',
+  },
+};
 
 export default function PlaygroundLayout() {
   const [workspaceStatus, setWorkspaceStatus] = useState<'idle' | 'provisioning' | 'ready' | 'error'>('idle');
@@ -103,15 +265,7 @@ export default function PlaygroundLayout() {
     orchestratorUrl: orchestratorUrl,
   });
 
-  const [files, setFiles] = useState<Record<string, File>>({
-    'src/App.tsx': { name: 'App.tsx', content: DEFAULT_APP_CODE, language: 'typescript' },
-    'package.json': { name: 'package.json', content: '{\n  "name": "my-app",\n  "version": "1.0.0"\n}', language: 'json' },
-    'README.md': { name: 'README.md', content: '# My App\n\nEdit src/App.tsx to see changes.', language: 'markdown' },
-    'public/index.html': {
-      name: 'index.html',
-      content: '<html> <body> <div id="root"></div> </body> </html>', language: 'html'
-    }
-  });
+  const [files, setFiles] = useState<Record<string, File>>(DEFAULT_FILES);
   const [activeFile, setActiveFile] = useState<string>('src/App.tsx');
   const [dependencies, setDependencies] = useState<Record<string, string>>({});
 
@@ -148,20 +302,22 @@ export default function PlaygroundLayout() {
       try {
         const parsed = JSON.parse(savedFiles);
         if (parsed['App.tsx'] && !parsed['src/App.tsx']) {
-          console.log('Migrating file structure...');
+          // v1 migration: flat App.tsx → new folder structure
           const migrated: Record<string, File> = {
-            'src/App.tsx': { ...parsed['App.tsx'], name: 'App.tsx' },
-            'package.json': { name: 'package.json', content: '{\n  "name": "my-app",\n  "version": "1.0.0"\n}', language: 'json' },
-            'README.md': { name: 'README.md', content: '# My App\n\nEdit src/App.tsx to see changes.', language: 'markdown' },
-            'public/index.html': { name: 'index.html', content: '<html><body><div id="root"></div></body></html>', language: 'html' }
+            ...DEFAULT_FILES,
+            'src/App.tsx': { ...DEFAULT_FILES['src/App.tsx'], content: parsed['App.tsx'].content },
           };
           Object.keys(parsed).forEach(key => {
-            if (key !== 'App.tsx') {
-              migrated[key] = parsed[key];
-            }
+            if (key !== 'App.tsx') migrated[key] = parsed[key];
           });
           finalFiles = migrated;
           setActiveFile('src/App.tsx');
+        } else if (!parsed['src/components/Button.tsx']) {
+          // v2 migration: old src/ structure → new structure with components/screens/hooks
+          finalFiles = {
+            ...DEFAULT_FILES,
+            ...parsed,
+          };
         } else {
           finalFiles = parsed;
         }
@@ -236,8 +392,10 @@ export default function PlaygroundLayout() {
     setActiveFile(path);
   };
 
+  const PROTECTED_FILES = new Set(['src/App.tsx', 'package.json']);
+
   const handleDeleteFile = (path: string) => {
-    if (path === 'src/App.tsx') return;
+    if (PROTECTED_FILES.has(path)) return;
     const newFiles = { ...files };
     delete newFiles[path];
 
