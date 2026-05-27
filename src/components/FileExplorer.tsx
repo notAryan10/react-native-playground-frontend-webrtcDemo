@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Folder, Plus, Trash2, Package, X, ChevronRight, ChevronDown, Search } from 'lucide-react';
+import { FileText, Folder, FolderPlus, FilePlus, Plus, Trash2, Package, X, ChevronRight, ChevronDown, Search } from 'lucide-react';
 
 export interface File {
     name: string;
@@ -176,6 +176,20 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
 
                     <span className="truncate flex-1">{node.name}</span>
 
+                    {node.type === 'folder' && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFolder(node.path);
+                                setIsCreating('file');
+                                if (!expandedFolders[node.path]) toggleFolder(node.path);
+                            }}
+                            title="New file in folder"
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-500/20 text-blue-400 rounded mr-1">
+                            <FilePlus size={12} />
+                        </button>
+                    )}
+
                     {node.type === 'file' && node.path !== 'src/App.tsx' && node.path !== 'package.json' && (
                         <button onClick={(e) => { e.stopPropagation(); onDeleteFile(node.path); }}
                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 text-red-500 rounded mr-1">
@@ -199,34 +213,40 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
                 <span>Files</span>
                 <div className="flex gap-1">
                     <button onClick={() => { setIsCreating('file'); setSelectedFolder(''); }}
-                        className="p-1 hover:bg-[#3e3e42] rounded text-gray-300"
+                        className="flex items-center gap-1 px-2 py-1 hover:bg-[#3e3e42] rounded text-gray-300 hover:text-white"
                         title="New File">
-                        <FileText size={14} />
+                        <FilePlus size={13} />
+                        <span className="normal-case text-[11px] font-medium">File</span>
                     </button>
                     <button onClick={() => { setIsCreating('folder'); setSelectedFolder(''); }}
-                        className="p-1 hover:bg-[#3e3e42] rounded text-gray-300"
+                        className="flex items-center gap-1 px-2 py-1 hover:bg-[#3e3e42] rounded text-gray-300 hover:text-white"
                         title="New Folder">
-                        <Folder size={14} />
+                        <FolderPlus size={13} />
+                        <span className="normal-case text-[11px] font-medium">Folder</span>
                     </button>
                 </div>
             </div>
 
             {isCreating && (
                 <form onSubmit={handleCreateSubmit} className="px-2 mb-2">
-                    <div className="text-[10px] text-gray-500 mb-1 ml-1">
-                        Creating {isCreating} in {selectedFolder || '/'}
+                    <div className="text-[10px] text-gray-500 mb-1 ml-1 flex items-center justify-between">
+                        <span>New {isCreating} in <span className="text-blue-400">{selectedFolder || '/'}</span></span>
+                        <button type="button" onClick={() => setIsCreating(null)} className="text-gray-600 hover:text-gray-400">
+                            <X size={11} />
+                        </button>
                     </div>
                     <div className="flex items-center gap-1 bg-[#3c3c3c] rounded px-2 py-1 border border-blue-500">
-                        {isCreating === 'folder' ? <Folder size={12} /> : <FileText size={12} />}
+                        {isCreating === 'folder' ? <Folder size={12} className="text-blue-400 shrink-0" /> : <FileText size={12} className="text-gray-400 shrink-0" />}
                         <input
                             autoFocus
                             className="bg-transparent text-white text-xs outline-none w-full placeholder-gray-500"
-                            placeholder="Name..."
+                            placeholder={isCreating === 'file' ? 'MyComponent.tsx' : 'folder-name'}
                             value={newItemName}
                             onChange={e => setNewItemName(e.target.value)}
-                            onBlur={() => !newItemName && setIsCreating(null)}
+                            onKeyDown={e => e.key === 'Escape' && setIsCreating(null)}
                         />
                     </div>
+                    <div className="text-[9px] text-gray-600 mt-1 ml-1">Enter to confirm, Esc to cancel</div>
                 </form>
             )}
 

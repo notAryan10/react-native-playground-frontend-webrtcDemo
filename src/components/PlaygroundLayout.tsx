@@ -9,7 +9,6 @@ import { ArrowLeft, Clock, Download, Settings as SettingsIcon, HelpCircle, FileT
 import { WebRTCViewerProps } from './WebRTCViewer';
 import { MonacoPlaygroundProps } from './MonacoPlayground';
 import { FileExplorer, File } from './FileExplorer';
-import * as Babel from '@babel/standalone';
 import TerminalPanel from './TerminalPanel';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -489,7 +488,7 @@ export default function PlaygroundLayout() {
     ws.onopen = () => {
       console.log('📝 Web Editor connected to signaling server');
       ws.send(JSON.stringify({ type: 'register', clientType: 'web' }));
-      sendCodeUpdate();
+      // Send all files — backend will bundle and push to mobile
       sendFileSync();
       // Replay all existing dependency bundles so a reconnected mobile gets them
       Object.entries(dependencies).forEach(([name, version]) => {
@@ -506,28 +505,8 @@ export default function PlaygroundLayout() {
     };
   }, [workspaceUrl]);
 
-  const sendCodeUpdate = () => {
-    const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN && files['src/App.tsx']) {
-      try {
-        const compiled = Babel.transform(files['src/App.tsx'].content, {
-          presets: ['env', 'react', 'typescript'],
-          filename: 'App.tsx',
-        }).code;
-
-        console.log('Sending transpiled code update...');
-
-        ws.send(JSON.stringify({
-          type: 'code-update',
-          code: compiled
-        }));
-        pushBuilderLog('info', 'Code successfully compiled and sent');
-      } catch (err: any) {
-        console.error('Compilation error:', err);
-        pushBuilderLog('error', `Compilation error: ${err.message} `);
-      }
-    }
-  };
+  // Transpilation moved to backend — this is now a no-op kept for reference.
+  // Backend bundles all files with @babel/core + reanimated plugin on file-update.
 
   const sendModuleBundle = async (name: string, version: string) => {
     const ws = wsRef.current;
@@ -590,21 +569,11 @@ export default function PlaygroundLayout() {
   };
 
   useEffect(() => {
-    
-    // Fast update for mobile preview
-    const codeTimeout = setTimeout(() => {
-      sendCodeUpdate();
-    }, 300);
-
-    // Slower update for disk persistence
-    const fileTimeout = setTimeout(() => {
+    // Single debounce: send changed file to backend, which rebundles and pushes to mobile
+    const timeout = setTimeout(() => {
       sendFileSync(activeFile);
-    }, 1000);
-
-    return () => {
-      clearTimeout(codeTimeout);
-      clearTimeout(fileTimeout);
-    };
+    }, 300);
+    return () => clearTimeout(timeout);
   }, [files, dependencies, activeFile]);
 
 
