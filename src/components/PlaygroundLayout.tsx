@@ -569,12 +569,13 @@ export default function PlaygroundLayout() {
   };
 
   useEffect(() => {
-    // Single debounce: send changed file to backend, which rebundles and pushes to mobile
+    // Always send all files so the backend registry is always complete before rebundling.
+    // Sending only activeFile caused "got: undefined" when App.tsx imported a file not yet in the registry.
     const timeout = setTimeout(() => {
-      sendFileSync(activeFile);
-    }, 300);
+      sendFileSync();
+    }, 500);
     return () => clearTimeout(timeout);
-  }, [files, dependencies, activeFile]);
+  }, [files, dependencies]);
 
 
   const themeColors = currentSettings.theme === 'dark' ? {
