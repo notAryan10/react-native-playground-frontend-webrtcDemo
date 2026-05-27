@@ -258,7 +258,7 @@ export default function PlaygroundLayout() {
     const cleanName = name.trim();
     setDependencies((prev: any) => {
       const newDeps = { ...prev, [cleanName]: version };
-      
+
       // Also update package.json in files state for UI consistency
       setFiles(prevFiles => {
         if (prevFiles['package.json']) {
@@ -281,10 +281,11 @@ export default function PlaygroundLayout() {
         }
         return prevFiles;
       });
-      
+
       return newDeps;
     });
-    pushBuilderLog('info', `Added dependency: ${cleanName} @${version} `);
+    pushBuilderLog('info', `Added dependency: ${cleanName} @${version}`);
+    sendModuleBundle(cleanName, version);
   };
 
   const handleRemoveDependency = (name: string) => {
@@ -332,6 +333,10 @@ export default function PlaygroundLayout() {
       ws.send(JSON.stringify({ type: 'register', clientType: 'web' }));
       sendCodeUpdate();
       sendFileSync();
+      // Replay all existing dependency bundles so a reconnected mobile gets them
+      Object.entries(dependencies).forEach(([name, version]) => {
+        sendModuleBundle(name, version as string);
+      });
     };
 
     ws.onclose = () => {
@@ -363,6 +368,22 @@ export default function PlaygroundLayout() {
         console.error('Compilation error:', err);
         pushBuilderLog('error', `Compilation error: ${err.message} `);
       }
+    }
+  };
+
+  const sendModuleBundle = async (name: string, version: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    try {
+      const esmUrl = `https://esm.sh/${name}@${version}?bundle-cjs`;
+      pushBuilderLog('info', `Fetching bundle for ${name}@${version}...`);
+      const res = await fetch(esmUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const code = await res.text();
+      ws.send(JSON.stringify({ type: 'module-bundle', name, code }));
+      pushBuilderLog('info', `Bundle sent for ${name}@${version} (${(code.length / 1024).toFixed(1)}KB)`);
+    } catch (err: any) {
+      pushBuilderLog('error', `Failed to fetch bundle for ${name}: ${err.message}`);
     }
   };
 
