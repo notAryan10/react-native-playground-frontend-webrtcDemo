@@ -529,9 +529,22 @@ export default function PlaygroundLayout() {
   // Transpilation moved to backend — this is now a no-op kept for reference.
   // Backend bundles all files with @babel/core + reanimated plugin on file-update.
 
+  // Packages pre-loaded as native modules in CodeRunner — no esm.sh fetch needed.
+  const NATIVE_MODULES = new Set([
+    'react', 'react-native', 'react-native-reanimated', 'react-native-gesture-handler',
+    '@react-native-async-storage/async-storage',
+    'expo-haptics', 'expo-av', 'expo-camera', 'expo-image-picker', 'expo-location',
+    'expo-sensors', 'expo-linear-gradient', 'expo-blur', 'expo-file-system', 'expo-notifications',
+    '@expo/vector-icons',
+  ]);
+
   const sendModuleBundle = async (name: string, version: string) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (NATIVE_MODULES.has(name)) {
+      pushBuilderLog('info', `${name} is a native module — no bundle needed.`);
+      return;
+    }
     try {
       const esmUrl = `https://esm.sh/${name}@${version}?bundle-cjs`;
       pushBuilderLog('info', `Fetching bundle for ${name}@${version}...`);
