@@ -504,6 +504,15 @@ export default function PlaygroundLayout() {
       });
     };
 
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'builder-log') {
+          pushBuilderLog(msg.level === 'error' ? 'error' : 'info', msg.message);
+        }
+      } catch {}
+    };
+
     ws.onclose = () => {
       setWsConnected(false);
       if (intentionalCloseRef.current) return;
