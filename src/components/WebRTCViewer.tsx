@@ -35,7 +35,7 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
         const fromId = msg.fromId;
 
         const pc = new RTCPeerConnection({
-          iceServers: [{ urls: process.env.NEXT_PUBLIC_STUN_SERVER || '' }],
+          iceServers: [{ urls: process.env.NEXT_PUBLIC_STUN_SERVER || 'stun:stun.l.google.com:19302' }],
         });
         pcRef.current = pc;
 
