@@ -510,6 +510,10 @@ export default function PlaygroundLayout() {
         if (msg.type === 'builder-log') {
           pushBuilderLog(msg.level === 'error' ? 'error' : 'info', msg.message);
         }
+        if (msg.type === 'resync-request') {
+          console.log('[Sync] Server requested file resync — sending all files');
+          sendFileSync();
+        }
       } catch {}
     };
 
