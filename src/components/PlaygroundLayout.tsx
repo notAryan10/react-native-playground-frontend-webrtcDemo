@@ -478,30 +478,51 @@ export default function PlaygroundLayout() {
   };
 
   const wsRef = useRef<WebSocket | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [pendingSync, setPendingSync] = useState(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const intentionalCloseRef = useRef(false);
 
-  useEffect(() => {
-    if (!workspaceUrl) return;
+  const connectWs = (url: string) => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
 
-    const ws = new WebSocket(workspaceUrl);
+    const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('📝 Web Editor connected to signaling server');
+      console.log('Web Editor connected to signaling server');
+      reconnectAttemptsRef.current = 0;
+      setWsConnected(true);
       ws.send(JSON.stringify({ type: 'register', clientType: 'web' }));
-      // Send all files — backend will bundle and push to mobile
       sendFileSync();
-      // Replay all existing dependency bundles so a reconnected mobile gets them
       Object.entries(dependencies).forEach(([name, version]) => {
         sendModuleBundle(name, version as string);
       });
     };
 
     ws.onclose = () => {
-      console.log('Web Editor disconnected');
+      setWsConnected(false);
+      if (intentionalCloseRef.current) return;
+      console.log('Web Editor disconnected — scheduling reconnect');
+      const delay = Math.min(1000 * 2 ** reconnectAttemptsRef.current, 15000);
+      reconnectAttemptsRef.current += 1;
+      reconnectTimerRef.current = setTimeout(() => connectWs(url), delay);
     };
+  };
+
+  useEffect(() => {
+    if (!workspaceUrl) return;
+    intentionalCloseRef.current = false;
+    connectWs(workspaceUrl);
 
     return () => {
-      ws.close();
+      intentionalCloseRef.current = true;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      wsRef.current?.close();
     };
   }, [workspaceUrl]);
 
@@ -526,46 +547,45 @@ export default function PlaygroundLayout() {
 
   const sendFileSync = (specificFile?: string) => {
     const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      if (specificFile && files[specificFile]) {
-        console.log(`Syncing ${specificFile} to workspace...`);
-        const fileData = files[specificFile];
-        
-        // If syncing package.json, ensure dependencies are included
-        let content = fileData.content;
-        if (specificFile === 'package.json') {
-          try {
-            const pkg = JSON.parse(content);
-            pkg.dependencies = { ...(pkg.dependencies || {}), ...dependencies };
-            content = JSON.stringify(pkg, null, 2);
-          } catch (e) {}
-        }
-
-        ws.send(JSON.stringify({
-          type: 'file-update',
-          files: { [specificFile]: { ...fileData, content } }
-        }));
-        return;
-      }
-
-      console.log('Syncing all files to workspace...');
-      const updatedFiles = { ...files };
-      if (updatedFiles['package.json']) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      setPendingSync(true);
+      return;
+    }
+    setPendingSync(false);
+    if (specificFile && files[specificFile]) {
+      console.log(`Syncing ${specificFile} to workspace...`);
+      const fileData = files[specificFile];
+      let content = fileData.content;
+      if (specificFile === 'package.json') {
         try {
-          const pkg = JSON.parse(updatedFiles['package.json'].content);
+          const pkg = JSON.parse(content);
           pkg.dependencies = { ...(pkg.dependencies || {}), ...dependencies };
-          updatedFiles['package.json'] = {
-            ...updatedFiles['package.json'],
-            content: JSON.stringify(pkg, null, 2)
-          };
+          content = JSON.stringify(pkg, null, 2);
         } catch (e) {}
       }
-
       ws.send(JSON.stringify({
         type: 'file-update',
-        files: updatedFiles
+        files: { [specificFile]: { ...fileData, content } }
       }));
+      return;
     }
+
+    console.log('Syncing all files to workspace...');
+    const updatedFiles = { ...files };
+    if (updatedFiles['package.json']) {
+      try {
+        const pkg = JSON.parse(updatedFiles['package.json'].content);
+        pkg.dependencies = { ...(pkg.dependencies || {}), ...dependencies };
+        updatedFiles['package.json'] = {
+          ...updatedFiles['package.json'],
+          content: JSON.stringify(pkg, null, 2)
+        };
+      } catch (e) {}
+    }
+    ws.send(JSON.stringify({
+      type: 'file-update',
+      files: updatedFiles
+    }));
   };
 
   useEffect(() => {
@@ -575,7 +595,7 @@ export default function PlaygroundLayout() {
       sendFileSync();
     }, 500);
     return () => clearTimeout(timeout);
-  }, [files, dependencies]);
+  }, [files, dependencies, wsConnected]);
 
 
   const themeColors = currentSettings.theme === 'dark' ? {
@@ -622,6 +642,14 @@ export default function PlaygroundLayout() {
           </button>
         </div>
         <div className="flex items-center gap-3">
+          {workspaceUrl && (
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`} />
+              <span style={{ color: themeColors.textSecondary }}>
+                {wsConnected ? (pendingSync ? 'Syncing...' : 'Synced') : 'Reconnecting...'}
+              </span>
+            </div>
+          )}
           {currentSettings.autoSave && lastSaved && (
             <div className="text-xs" style={{ color: themeColors.textSecondary }}>
               Saved {lastSaved.toLocaleTimeString()}
