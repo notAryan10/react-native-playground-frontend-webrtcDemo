@@ -130,7 +130,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
         e.preventDefault();
         if (!newItemName.trim()) return;
 
-        let path = selectedFolder ? `${selectedFolder}/${newItemName}` : newItemName;
+        // Base the new path on the selected folder, or fall back to the directory
+        // of the file currently being edited (defaults to 'src' since the entry is
+        // 'src/App.tsx'). Creating at the workspace root produced files like
+        // 'components/Card.tsx' that './components/Card' imports from src/App.tsx
+        // could not resolve, rendering a "Missing module" stub on the device.
+        const baseDir = selectedFolder
+            || (activeFile.includes('/') ? activeFile.split('/').slice(0, -1).join('/') : '');
+        let path = baseDir ? `${baseDir}/${newItemName}` : newItemName;
 
         if (isCreating === 'file') {
             if (!path.includes('.')) path += '.tsx'; 
