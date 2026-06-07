@@ -224,7 +224,7 @@ export default function PlaygroundLayout() {
   }, []);
 
   const [showSettings, setShowSettings] = useState(false);
-  const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'terminal'>('console');
+  const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'terminal' | 'inspector'>('console');
   
   useEffect(() => {
     if (!userId) return;
@@ -267,6 +267,15 @@ export default function PlaygroundLayout() {
   const [files, setFiles] = useState<Record<string, File>>(DEFAULT_FILES);
   const [activeFile, setActiveFile] = useState<string>('src/App.tsx');
   const [dependencies, setDependencies] = useState<Record<string, string>>({});
+
+  // The WS onmessage closure is created once per connection and would otherwise
+  // read a stale `files`; this ref always points at the latest map.
+  const filesRef = useRef(files);
+  filesRef.current = files;
+
+  // Tap-to-source: where to jump in Monaco, and the resolved element details.
+  const [inspectTarget, setInspectTarget] = useState<{ line: number; column: number; nonce: number } | null>(null);
+  const [inspectInfo, setInspectInfo] = useState<{ componentName: string | null; source: string | null; props: Record<string, any> | null } | null>(null);
 
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -484,6 +493,29 @@ export default function PlaygroundLayout() {
   const reconnectAttemptsRef = useRef(0);
   const intentionalCloseRef = useRef(false);
 
+  const handleInspectResult = (msg: any) => {
+    setInspectInfo({ componentName: msg.componentName ?? null, source: msg.source ?? null, props: msg.props ?? null });
+    if (msg.source) {
+      const m = String(msg.source).match(/^(.*):(\d+):(\d+)$/);
+      if (m) {
+        const path = m[1];
+        const line = parseInt(m[2], 10);
+        const column = parseInt(m[3], 10) + 1; // Babel columns are 0-based; Monaco is 1-based
+        if (filesRef.current[path]) {
+          setActiveFile(path);
+          setInspectTarget({ line, column, nonce: Date.now() });
+          setActiveBottomTab('inspector');
+          pushBuilderLog('info', `Inspector: ${msg.componentName || 'element'} -> ${path}:${line}`);
+          return;
+        }
+        pushBuilderLog('error', `Inspector: ${path} is not an open file`);
+        return;
+      }
+    }
+    setActiveBottomTab('inspector');
+    pushBuilderLog('info', 'Inspector: no source mapping for the tapped element');
+  };
+
   const connectWs = (url: string) => {
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
@@ -513,6 +545,9 @@ export default function PlaygroundLayout() {
         if (msg.type === 'resync-request') {
           console.log('[Sync] Server requested file resync — sending all files');
           sendFileSync();
+        }
+        if (msg.type === 'inspect-result') {
+          handleInspectResult(msg);
         }
       } catch {}
     };
@@ -719,6 +754,7 @@ export default function PlaygroundLayout() {
                   settings={currentSettings}
                   language={files[activeFile]?.language || 'typescript'}
                   dependencies={dependencies}
+                  revealTarget={inspectTarget}
                 />
               </div>
             </div>
@@ -776,6 +812,20 @@ export default function PlaygroundLayout() {
                   >
                     Terminal
                   </button>
+                  <button
+                    onClick={() => setActiveBottomTab('inspector')}
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '12px',
+                      backgroundColor: activeBottomTab === 'inspector' ? themeColors.bgPrimary : 'transparent',
+                      color: themeColors.text,
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Inspector
+                  </button>
                 </div>
 
                 <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -786,8 +836,43 @@ export default function PlaygroundLayout() {
                       onClearLogs={() => setLogs([])}
                       onClearBuilderLogs={() => setBuilderLogs([])}
                     />
-                  ) : (
+                  ) : activeBottomTab === 'terminal' ? (
                     <TerminalPanel terminalUrl={workspaceUrl || undefined} />
+                  ) : (
+                    <div style={{ height: '100%', overflow: 'auto', padding: 12, fontSize: 12, fontFamily: 'monospace', color: themeColors.text }}>
+                      {!inspectInfo ? (
+                        <div style={{ color: themeColors.textSecondary }}>
+                          Enable <strong>Inspect</strong> in the preview, then tap any element on the device to jump to its source here.
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ marginBottom: 8 }}>
+                            <span style={{ color: themeColors.textSecondary }}>Component: </span>
+                            <span style={{ color: '#00bcd4', fontWeight: 700 }}>{inspectInfo.componentName || '(host element)'}</span>
+                          </div>
+                          {inspectInfo.source && (
+                            <button
+                              onClick={() => {
+                                const m = String(inspectInfo.source).match(/^(.*):(\d+):(\d+)$/);
+                                if (m && filesRef.current[m[1]]) {
+                                  setActiveFile(m[1]);
+                                  setInspectTarget({ line: parseInt(m[2], 10), column: parseInt(m[3], 10) + 1, nonce: Date.now() });
+                                }
+                              }}
+                              style={{ marginBottom: 10, color: '#00e5ff', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'monospace', fontSize: 12 }}
+                            >
+                              {inspectInfo.source}
+                            </button>
+                          )}
+                          <div style={{ color: themeColors.textSecondary, margin: '8px 0 4px' }}>Props</div>
+                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                            {inspectInfo.props && Object.keys(inspectInfo.props).length
+                              ? JSON.stringify(inspectInfo.props, null, 2)
+                              : '(none)'}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

@@ -11,6 +11,19 @@ export interface MonacoPlaygroundProps {
   settings: Settings;
   language?: string;
   dependencies?: Record<string, string>;
+  // Tap-to-source: when this changes (by nonce), jump to and flash the line.
+  revealTarget?: { line: number; column: number; nonce: number } | null;
+}
+
+// Global style for the tap-to-source line flash. Monaco renders decorations in
+// its own DOM, so the class must be a plain global rule (not a CSS module).
+if (typeof document !== 'undefined' && !document.getElementById('rnp-inspect-style')) {
+  const el = document.createElement('style');
+  el.id = 'rnp-inspect-style';
+  el.textContent =
+    '.rnp-inspect-line{background:rgba(0,229,255,0.18);}' +
+    '.rnp-inspect-glyph{background:#00e5ff;width:3px !important;margin-left:3px;}';
+  document.head.appendChild(el);
 }
 
 export const MonacoPlayground: React.FC<MonacoPlaygroundProps> = ({
@@ -18,10 +31,12 @@ export const MonacoPlayground: React.FC<MonacoPlaygroundProps> = ({
   onChange,
   settings,
   language = 'typescript',
-  dependencies = {}
+  dependencies = {},
+  revealTarget = null
 }) => {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<any>(null);
+  const decorationsRef = useRef<string[]>([]);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -230,6 +245,33 @@ export const MonacoPlayground: React.FC<MonacoPlaygroundProps> = ({
     });
   };
 
+  // Tap-to-source: reveal + flash the line reported by the device. Runs after
+  // the (possibly newly-switched) file's content is in the model.
+  React.useEffect(() => {
+    if (!revealTarget) return;
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!ed || !monaco) return;
+    const line = Math.max(1, revealTarget.line);
+    const column = Math.max(1, revealTarget.column);
+    ed.revealLineInCenter(line);
+    ed.setPosition({ lineNumber: line, column });
+    ed.focus();
+    decorationsRef.current = ed.deltaDecorations(decorationsRef.current, [
+      {
+        range: new monaco.Range(line, 1, line, 1),
+        options: { isWholeLine: true, className: 'rnp-inspect-line', glyphMarginClassName: 'rnp-inspect-glyph' },
+      },
+    ]);
+    const t = setTimeout(() => {
+      try {
+        decorationsRef.current = ed.deltaDecorations(decorationsRef.current, []);
+      } catch {}
+    }, 1800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealTarget?.nonce]);
+
   React.useEffect(() => {
     const fetchTypes = async () => {
       if (!monacoRef.current) return;
@@ -272,6 +314,7 @@ export const MonacoPlayground: React.FC<MonacoPlaygroundProps> = ({
         renderWhitespace: 'none',
         tabSize: 2,
         insertSpaces: true,
+        glyphMargin: true,
       }}
     />
   );

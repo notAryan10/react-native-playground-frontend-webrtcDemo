@@ -11,6 +11,28 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState('idle');
+  const [inspectMode, setInspectMode] = useState(false);
+  // Last tap marker, shown briefly so the user sees where they clicked.
+  const [tapMark, setTapMark] = useState<{ x: number; y: number } | null>(null);
+
+  // Tap-to-source: translate a click on the streamed video into a normalized
+  // [0,1] coordinate and ask the device to resolve it. The video element has no
+  // explicit height (auto by aspect ratio), so its rect equals the content rect
+  // with no letterboxing to compensate for.
+  const handleInspectClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const rect = video.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const nx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const ny = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    setTapMark({ x: nx, y: ny });
+    setTimeout(() => setTapMark(null), 1200);
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'inspect-at', x: nx, y: ny, requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }));
+    }
+  };
 
   useEffect(() => {
     if (!signalingUrl) return;
@@ -78,16 +100,68 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
 
   return (
     <div style={{ background: '#000', padding: 20 }}>
-      <h3 style={{ color: 'white' }}>WebRTC Viewer</h3>
-      <p style={{ color: 'gray' }}>Status: {status}</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div>
+          <h3 style={{ color: 'white', margin: 0 }}>WebRTC Viewer</h3>
+          <p style={{ color: 'gray', margin: 0, fontSize: 12 }}>Status: {status}</p>
+        </div>
+        <button
+          onClick={() => setInspectMode((v) => !v)}
+          title="Tap an element on the device to jump to its source"
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            padding: '6px 12px',
+            borderRadius: 6,
+            border: `1px solid ${inspectMode ? '#00e5ff' : '#333'}`,
+            background: inspectMode ? 'rgba(0,229,255,0.15)' : 'transparent',
+            color: inspectMode ? '#00e5ff' : '#aaa',
+            cursor: 'pointer',
+          }}
+        >
+          {inspectMode ? 'Inspecting' : 'Inspect'}
+        </button>
+      </div>
 
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        style={{ width: '100%', maxWidth: 500 }}
-      />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 500 }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{ width: '100%', display: 'block' }}
+        />
+        {inspectMode && (
+          <div
+            onClick={handleInspectClick}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              cursor: 'crosshair',
+              outline: '2px solid rgba(0,229,255,0.6)',
+              outlineOffset: '-2px',
+            }}
+          >
+            {tapMark && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${tapMark.x * 100}%`,
+                  top: `${tapMark.y * 100}%`,
+                  width: 14,
+                  height: 14,
+                  marginLeft: -7,
+                  marginTop: -7,
+                  borderRadius: '50%',
+                  border: '2px solid #00e5ff',
+                  background: 'rgba(0,229,255,0.3)',
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
