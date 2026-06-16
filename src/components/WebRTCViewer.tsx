@@ -93,13 +93,16 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
             const p = pcRef.current;
             if (!p) return;
             const stats = await p.getStats();
+            let sawInbound = false;
             stats.forEach((r: any) => {
-              if (r.type === 'inbound-rtp' && r.kind === 'video') {
+              if (r.type === 'inbound-rtp' && (r.kind === 'video' || r.mediaType === 'video')) {
+                sawInbound = true;
                 console.log('[WebRTC] inbound video — bytes:', r.bytesReceived,
                   'framesDecoded:', r.framesDecoded, 'frameWidth:', r.frameWidth,
                   'frameHeight:', r.frameHeight, 'framesDropped:', r.framesDropped);
               }
             });
+            if (!sawInbound) console.log('[WebRTC] no inbound-rtp video report yet');
           }, 2000);
           pc.addEventListener('connectionstatechange', () => {
             if (pc!.connectionState === 'closed') clearInterval(statsTimer);
