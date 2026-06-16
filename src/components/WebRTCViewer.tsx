@@ -79,9 +79,31 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
             const v = videoRef.current;
             if (v && stream && v.srcObject !== stream) {
               v.srcObject = stream;
+              v.onloadedmetadata = () =>
+                console.log('[WebRTC] video metadata —', v.videoWidth, 'x', v.videoHeight, 'readyState:', v.readyState);
               v.play().catch((err) => console.warn('[WebRTC] video.play() rejected:', err));
             }
           };
+
+          // Probe whether frames are actually decoding. If bytesReceived grows
+          // but framesDecoded stays 0 -> decode issue. If both grow but video is
+          // still black -> the element isn't painting (frontend). If neither
+          // grows -> nothing is arriving (sender/network).
+          const statsTimer = setInterval(async () => {
+            const p = pcRef.current;
+            if (!p) return;
+            const stats = await p.getStats();
+            stats.forEach((r: any) => {
+              if (r.type === 'inbound-rtp' && r.kind === 'video') {
+                console.log('[WebRTC] inbound video — bytes:', r.bytesReceived,
+                  'framesDecoded:', r.framesDecoded, 'frameWidth:', r.frameWidth,
+                  'frameHeight:', r.frameHeight, 'framesDropped:', r.framesDropped);
+              }
+            });
+          }, 2000);
+          pc.addEventListener('connectionstatechange', () => {
+            if (pc!.connectionState === 'closed') clearInterval(statsTimer);
+          });
 
           // The real signal that media can flow; the SDP answer being sent does
           // not mean ICE succeeded (it may still fail, e.g. needs TURN).
