@@ -10,6 +10,9 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // The mobile peer's id for the current session; updated on each offer so ICE
+  // candidates from a reused connection still route to the right device.
+  const fromIdRef = useRef<string | undefined>(undefined);
   const [status, setStatus] = useState('idle');
   const [inspectMode, setInspectMode] = useState(false);
   // Last tap marker, shown briefly so the user sees where they clicked.
@@ -53,41 +56,50 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
       const msg = JSON.parse(event.data);
 
       if (msg.type === 'offer') {
-        setStatus('offer-received');
-        const fromId = msg.fromId;
+        fromIdRef.current = msg.fromId;
 
-        const pc = new RTCPeerConnection({
-          iceServers: [{ urls: process.env.NEXT_PUBLIC_STUN_SERVER || 'stun:stun.l.google.com:19302' }],
-        });
-        pcRef.current = pc;
+        // Reuse a single peer connection. The mobile re-offers on every
+        // client-connected (editor sync socket, this viewer, each frontend
+        // hot-reload), so building a fresh pc per offer churned ontrack and
+        // reassigned srcObject repeatedly, aborting play() before any frame
+        // rendered (black video). Renegotiation offers now apply to the
+        // existing connection instead.
+        let pc = pcRef.current;
+        if (!pc) {
+          pc = new RTCPeerConnection({
+            iceServers: [{ urls: process.env.NEXT_PUBLIC_STUN_SERVER || 'stun:stun.l.google.com:19302' }],
+          });
+          pcRef.current = pc;
 
-        pc.ontrack = (event) => {
-          const stream = event.streams[0];
-          console.log('[WebRTC] ontrack fired — streams:', event.streams.length,
-            'video tracks:', stream?.getVideoTracks().length,
-            'track state:', stream?.getVideoTracks()[0]?.readyState);
-          if (videoRef.current && stream) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch((err) => console.warn('[WebRTC] video.play() rejected:', err));
-          }
-        };
+          pc.ontrack = (event) => {
+            const stream = event.streams[0];
+            console.log('[WebRTC] ontrack fired — streams:', event.streams.length,
+              'video tracks:', stream?.getVideoTracks().length,
+              'track state:', stream?.getVideoTracks()[0]?.readyState);
+            const v = videoRef.current;
+            if (v && stream && v.srcObject !== stream) {
+              v.srcObject = stream;
+              v.play().catch((err) => console.warn('[WebRTC] video.play() rejected:', err));
+            }
+          };
 
-        // The real signal that media can flow. setStatus('connected') below only
-        // means the SDP answer was sent; ICE may still fail (e.g. needs TURN).
-        pc.oniceconnectionstatechange = () => {
-          console.log('[WebRTC] ICE state:', pc.iceConnectionState);
-          setStatus('ice-' + pc.iceConnectionState);
-        };
+          // The real signal that media can flow; the SDP answer being sent does
+          // not mean ICE succeeded (it may still fail, e.g. needs TURN).
+          pc.oniceconnectionstatechange = () => {
+            console.log('[WebRTC] ICE state:', pc!.iceConnectionState);
+            setStatus('ice-' + pc!.iceConnectionState);
+          };
 
-        pc.onicecandidate = (e) => {
-          if (e.candidate) {
-            ws.send(JSON.stringify({
-              type: 'ice-candidate',
-              candidate: e.candidate,
-              targetId: fromId
-            }));
-          }
-        };
+          pc.onicecandidate = (e) => {
+            if (e.candidate) {
+              ws.send(JSON.stringify({
+                type: 'ice-candidate',
+                candidate: e.candidate,
+                targetId: fromIdRef.current,
+              }));
+            }
+          };
+        }
 
         await pc.setRemoteDescription(msg.offer);
         const answer = await pc.createAnswer();
@@ -96,10 +108,8 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
         ws.send(JSON.stringify({
           type: 'answer',
           answer,
-          targetId: fromId
+          targetId: fromIdRef.current,
         }));
-
-        setStatus('connected');
       }
 
       if (msg.type === 'ice-candidate') {
