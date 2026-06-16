@@ -62,9 +62,21 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
         pcRef.current = pc;
 
         pc.ontrack = (event) => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = event.streams[0];
+          const stream = event.streams[0];
+          console.log('[WebRTC] ontrack fired — streams:', event.streams.length,
+            'video tracks:', stream?.getVideoTracks().length,
+            'track state:', stream?.getVideoTracks()[0]?.readyState);
+          if (videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch((err) => console.warn('[WebRTC] video.play() rejected:', err));
           }
+        };
+
+        // The real signal that media can flow. setStatus('connected') below only
+        // means the SDP answer was sent; ICE may still fail (e.g. needs TURN).
+        pc.oniceconnectionstatechange = () => {
+          console.log('[WebRTC] ICE state:', pc.iceConnectionState);
+          setStatus('ice-' + pc.iceConnectionState);
         };
 
         pc.onicecandidate = (e) => {
