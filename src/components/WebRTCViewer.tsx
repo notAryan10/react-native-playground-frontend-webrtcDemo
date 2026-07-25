@@ -153,8 +153,8 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   }, [signalingUrl]);
 
   return (
-    <div style={{ background: '#000', padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+    <div style={{ background: '#000', padding: 12, height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
         <div>
           <h3 style={{ color: 'white', margin: 0 }}>WebRTC Viewer</h3>
           <p style={{ color: 'gray', margin: 0, fontSize: 12 }}>Status: {status}</p>
@@ -177,14 +177,15 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
         </button>
       </div>
 
-      <div style={{ position: 'relative', width: '100%', maxWidth: 500 }}>
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{ width: '100%', display: 'block' }}
-        />
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ position: 'relative', height: '100%', display: 'flex' }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
+          />
         {inspectMode && (
           <div
             onClick={handleInspectClick}
@@ -215,6 +216,7 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
