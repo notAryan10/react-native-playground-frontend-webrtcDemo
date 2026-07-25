@@ -27,10 +27,27 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
     if (!video) return;
     const rect = video.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    const nx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const ny = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    setTapMark({ x: nx, y: ny });
+
+    // Visual tap marker: position within the video element box (the overlay).
+    const boxX = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const boxY = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    setTapMark({ x: boxX, y: boxY });
     setTimeout(() => setTapMark(null), 1200);
+
+    // Device hit-test coordinate: normalize against the actual video frame, not
+    // the element box. With object-fit: contain the frame is letterboxed inside
+    // the element, so subtract that offset/scale or every tap is skewed toward an
+    // edge. Falls back to the box when intrinsic size is unknown (no-op letterbox).
+    const vw = video.videoWidth || rect.width;
+    const vh = video.videoHeight || rect.height;
+    const scale = Math.min(rect.width / vw, rect.height / vh);
+    const contentW = vw * scale;
+    const contentH = vh * scale;
+    const offX = (rect.width - contentW) / 2;
+    const offY = (rect.height - contentH) / 2;
+    const nx = Math.min(1, Math.max(0, (e.clientX - rect.left - offX) / contentW));
+    const ny = Math.min(1, Math.max(0, (e.clientY - rect.top - offY) / contentH));
+
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'inspect-at', x: nx, y: ny, requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }));
