@@ -25,7 +25,7 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   const handleInspectClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const video = videoRef.current;
     if (!video) return;
-    const rect = video.getBoundingClientRect();
+    const rect = videoRef.current!.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
 
     // Visual tap marker: position within the video element box (the overlay).
@@ -47,6 +47,13 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
     const offY = (rect.height - contentH) / 2;
     const nx = Math.min(1, Math.max(0, (e.clientX - rect.left - offX) / contentW));
     const ny = Math.min(1, Math.max(0, (e.clientY - rect.top - offY) / contentH));
+
+    console.log('[InspectDbg-web]',
+      'click=', JSON.stringify({ x: Math.round(e.clientX), y: Math.round(e.clientY) }),
+      'videoRect=', JSON.stringify({ top: Math.round(rect.top), left: Math.round(rect.left), w: Math.round(rect.width), h: Math.round(rect.height) }),
+      'intrinsic=', JSON.stringify({ vw, vh }),
+      'content=', JSON.stringify({ contentW: Math.round(contentW), contentH: Math.round(contentH), offX: Math.round(offX), offY: Math.round(offY) }),
+      'sent=', JSON.stringify({ nx: +nx.toFixed(4), ny: +ny.toFixed(4) }));
 
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
