@@ -67,9 +67,6 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
         let pc = pcRef.current;
         if (!pc) {
           pc = new RTCPeerConnection({
-            // STUN alone can't relay media across symmetric NATs (phone on mobile
-            // data + browser behind the tunnel), so ICE "connects" but no RTP
-            // arrives. A TURN server relays it. Set NEXT_PUBLIC_TURN_* to enable.
             iceServers: [
               { urls: process.env.NEXT_PUBLIC_STUN_SERVER || 'stun:stun.l.google.com:19302' },
               ...(process.env.NEXT_PUBLIC_TURN_URL ? [{
