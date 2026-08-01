@@ -10,6 +10,11 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  // Slice of the captured screen that is the app preview (normalized). Defaults
+  // to the whole frame until the device reports its rect.
+  const [crop, setCrop] = useState({ x: 0, y: 0, w: 1, h: 1 });
+  const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
   // The mobile peer's id for the current session; updated on each offer so ICE
   // candidates from a reused connection still route to the right device.
   const fromIdRef = useRef<string | undefined>(undefined);
@@ -23,37 +28,15 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   // explicit height (auto by aspect ratio), so its rect equals the content rect
   // with no letterboxing to compensate for.
   const handleInspectClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const video = videoRef.current;
-    if (!video) return;
-    const rect = videoRef.current!.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
+    // The crop box is exactly the device's capture view, with no letterboxing —
+    // so a position within it is already the normalized device coordinate.
+    const rect = frameRef.current?.getBoundingClientRect();
+    if (!rect || !rect.width || !rect.height) return;
 
-    // Visual tap marker: position within the video element box (the overlay).
-    const boxX = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const boxY = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    setTapMark({ x: boxX, y: boxY });
+    const nx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const ny = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    setTapMark({ x: nx, y: ny });
     setTimeout(() => setTapMark(null), 1200);
-
-    // Device hit-test coordinate: normalize against the actual video frame, not
-    // the element box. With object-fit: contain the frame is letterboxed inside
-    // the element, so subtract that offset/scale or every tap is skewed toward an
-    // edge. Falls back to the box when intrinsic size is unknown (no-op letterbox).
-    const vw = video.videoWidth || rect.width;
-    const vh = video.videoHeight || rect.height;
-    const scale = Math.min(rect.width / vw, rect.height / vh);
-    const contentW = vw * scale;
-    const contentH = vh * scale;
-    const offX = (rect.width - contentW) / 2;
-    const offY = (rect.height - contentH) / 2;
-    const nx = Math.min(1, Math.max(0, (e.clientX - rect.left - offX) / contentW));
-    const ny = Math.min(1, Math.max(0, (e.clientY - rect.top - offY) / contentH));
-
-    console.log('[InspectDbg-web]',
-      'click=', JSON.stringify({ x: Math.round(e.clientX), y: Math.round(e.clientY) }),
-      'videoRect=', JSON.stringify({ top: Math.round(rect.top), left: Math.round(rect.left), w: Math.round(rect.width), h: Math.round(rect.height) }),
-      'intrinsic=', JSON.stringify({ vw, vh }),
-      'content=', JSON.stringify({ contentW: Math.round(contentW), contentH: Math.round(contentH), offX: Math.round(offX), offY: Math.round(offY) }),
-      'sent=', JSON.stringify({ nx: +nx.toFixed(4), ny: +ny.toFixed(4) }));
 
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -171,6 +154,10 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
       if (msg.type === 'ice-candidate') {
         await pcRef.current?.addIceCandidate(msg.candidate);
       }
+
+      if (msg.type === 'capture-rect' && msg.rect?.w && msg.rect?.h) {
+        setCrop({ x: msg.rect.x, y: msg.rect.y, w: msg.rect.w, h: msg.rect.h });
+      }
     };
 
     return () => ws.close();
@@ -202,13 +189,35 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
       </div>
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <div style={{ position: 'relative', height: '100%', display: 'flex' }}>
+        <div
+          ref={frameRef}
+          style={{
+            position: 'relative',
+            height: '100%',
+            overflow: 'hidden',
+            // Aspect of the cropped region, so the box hugs the app preview.
+            aspectRatio: videoSize
+              ? `${(crop.w * videoSize.w) / (crop.h * videoSize.h)}`
+              : '9 / 19.5',
+          }}
+        >
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
-            style={{ height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
+            onLoadedMetadata={(e) =>
+              setVideoSize({ w: e.currentTarget.videoWidth, h: e.currentTarget.videoHeight })
+            }
+            style={{
+              position: 'absolute',
+              width: `${100 / crop.w}%`,
+              height: `${100 / crop.h}%`,
+              left: `${(-100 * crop.x) / crop.w}%`,
+              top: `${(-100 * crop.y) / crop.h}%`,
+              objectFit: 'fill',
+              display: 'block',
+            }}
           />
         {inspectMode && (
           <div
