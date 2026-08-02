@@ -136,9 +136,6 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
         await pcRef.current?.addIceCandidate(msg.candidate);
       }
 
-      // The device left. Its media is dead, but a <video> holds its last frame
-      // forever, which reads as "still streaming". Drop the connection and the
-      // picture so the panel honestly shows there is nothing to watch.
       if (msg.type === 'client-disconnected' && msg.clientType === 'mobile') {
         pcRef.current?.close();
         pcRef.current = null;
@@ -153,10 +150,6 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
       }
     };
 
-    // Closing the socket alone leaves the peer connection alive: it holds an ICE
-    // agent and keeps receiving media into a component that no longer exists.
-    // A changed signalingUrl re-runs this effect, so without it every switch
-    // strands a connection.
     return () => {
       ws.close();
       pcRef.current?.close();
