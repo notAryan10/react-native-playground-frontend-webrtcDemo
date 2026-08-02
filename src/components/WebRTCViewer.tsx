@@ -13,8 +13,6 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   // The mobile peer's id for the current session; updated on each offer so ICE
   // candidates from a reused connection still route to the right device.
   const fromIdRef = useRef<string | undefined>(undefined);
-  // Held so teardown can stop it: close() does not fire connectionstatechange.
-  const statsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [status, setStatus] = useState('idle');
   const [inspectMode, setInspectMode] = useState(false);
   // Last tap marker, shown briefly so the user sees where they clicked.
@@ -50,12 +48,6 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
     const nx = Math.min(1, Math.max(0, (e.clientX - rect.left - offX) / contentW));
     const ny = Math.min(1, Math.max(0, (e.clientY - rect.top - offY) / contentH));
 
-    console.log('[InspectDbg-web]',
-      'click=', JSON.stringify({ x: Math.round(e.clientX), y: Math.round(e.clientY) }),
-      'videoRect=', JSON.stringify({ top: Math.round(rect.top), left: Math.round(rect.left), w: Math.round(rect.width), h: Math.round(rect.height) }),
-      'intrinsic=', JSON.stringify({ vw, vh }),
-      'content=', JSON.stringify({ contentW: Math.round(contentW), contentH: Math.round(contentH), offX: Math.round(offX), offY: Math.round(offY) }),
-      'sent=', JSON.stringify({ nx: +nx.toFixed(4), ny: +ny.toFixed(4) }));
 
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -70,7 +62,6 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log('✅ WebRTC Viewer connected to signaling');
       setStatus('signaling-connected');
       ws.send(JSON.stringify({
         type: 'register',
@@ -106,46 +97,16 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
 
           pc.ontrack = (event) => {
             const stream = event.streams[0];
-            console.log('[WebRTC] ontrack fired — streams:', event.streams.length,
-              'video tracks:', stream?.getVideoTracks().length,
-              'track state:', stream?.getVideoTracks()[0]?.readyState);
             const v = videoRef.current;
             if (v && stream && v.srcObject !== stream) {
               v.srcObject = stream;
-              v.onloadedmetadata = () =>
-                console.log('[WebRTC] video metadata —', v.videoWidth, 'x', v.videoHeight, 'readyState:', v.readyState);
               v.play().catch((err) => console.warn('[WebRTC] video.play() rejected:', err));
             }
           };
 
-          // Probe whether frames are actually decoding. If bytesReceived grows
-          // but framesDecoded stays 0 -> decode issue. If both grow but video is
-          // still black -> the element isn't painting (frontend). If neither
-          // grows -> nothing is arriving (sender/network).
-          const statsTimer = setInterval(async () => {
-            const p = pcRef.current;
-            if (!p) return;
-            const stats = await p.getStats();
-            let sawInbound = false;
-            stats.forEach((r: any) => {
-              if (r.type === 'inbound-rtp' && (r.kind === 'video' || r.mediaType === 'video')) {
-                sawInbound = true;
-                console.log('[WebRTC] inbound video — bytes:', r.bytesReceived,
-                  'framesDecoded:', r.framesDecoded, 'frameWidth:', r.frameWidth,
-                  'frameHeight:', r.frameHeight, 'framesDropped:', r.framesDropped);
-              }
-            });
-            if (!sawInbound) console.log('[WebRTC] no inbound-rtp video report yet');
-          }, 2000);
-          statsTimerRef.current = statsTimer;
-          pc.addEventListener('connectionstatechange', () => {
-            if (pc!.connectionState === 'closed') clearInterval(statsTimer);
-          });
-
           // The real signal that media can flow; the SDP answer being sent does
           // not mean ICE succeeded (it may still fail, e.g. needs TURN).
           pc.oniceconnectionstatechange = () => {
-            console.log('[WebRTC] ICE state:', pc!.iceConnectionState);
             setStatus('ice-' + pc!.iceConnectionState);
           };
 
@@ -181,10 +142,6 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
       if (msg.type === 'client-disconnected' && msg.clientType === 'mobile') {
         pcRef.current?.close();
         pcRef.current = null;
-        if (statsTimerRef.current) {
-          clearInterval(statsTimerRef.current);
-          statsTimerRef.current = null;
-        }
         fromIdRef.current = undefined;
         const v = videoRef.current;
         if (v) {
