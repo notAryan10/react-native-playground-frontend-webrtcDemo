@@ -13,6 +13,8 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   // The mobile peer's id for the current session; updated on each offer so ICE
   // candidates from a reused connection still route to the right device.
   const fromIdRef = useRef<string | undefined>(undefined);
+  // Held so teardown can stop it: close() does not fire connectionstatechange.
+  const statsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [status, setStatus] = useState('idle');
   const [inspectMode, setInspectMode] = useState(false);
   // Last tap marker, shown briefly so the user sees where they clicked.
@@ -135,6 +137,7 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
             });
             if (!sawInbound) console.log('[WebRTC] no inbound-rtp video report yet');
           }, 2000);
+          statsTimerRef.current = statsTimer;
           pc.addEventListener('connectionstatechange', () => {
             if (pc!.connectionState === 'closed') clearInterval(statsTimer);
           });
@@ -170,6 +173,26 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
 
       if (msg.type === 'ice-candidate') {
         await pcRef.current?.addIceCandidate(msg.candidate);
+      }
+
+      // The device left. Its media is dead, but a <video> holds its last frame
+      // forever, which reads as "still streaming". Drop the connection and the
+      // picture so the panel honestly shows there is nothing to watch.
+      if (msg.type === 'client-disconnected' && msg.clientType === 'mobile') {
+        pcRef.current?.close();
+        pcRef.current = null;
+        if (statsTimerRef.current) {
+          clearInterval(statsTimerRef.current);
+          statsTimerRef.current = null;
+        }
+        fromIdRef.current = undefined;
+        const v = videoRef.current;
+        if (v) {
+          v.srcObject = null;
+          v.removeAttribute('src');
+          v.load();
+        }
+        setStatus('device-disconnected');
       }
     };
 
