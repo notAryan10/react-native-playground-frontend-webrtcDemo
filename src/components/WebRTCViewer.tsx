@@ -153,7 +153,15 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
       }
     };
 
-    return () => ws.close();
+    // Closing the socket alone leaves the peer connection alive: it holds an ICE
+    // agent and keeps receiving media into a component that no longer exists.
+    // A changed signalingUrl re-runs this effect, so without it every switch
+    // strands a connection.
+    return () => {
+      ws.close();
+      pcRef.current?.close();
+      pcRef.current = null;
+    };
   }, [signalingUrl]);
 
   return (
