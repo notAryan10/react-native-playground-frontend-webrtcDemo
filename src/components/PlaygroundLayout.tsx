@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { SettingsPanel, Settings } from './SettingsPanel';
 import ConsolePanel, { LogEntry, LogLevel } from './ConsolePanel';
-import { ArrowLeft, Clock, Download, Settings as SettingsIcon, HelpCircle, FileText, Smartphone } from 'lucide-react';
+import { ArrowLeft, Clock, Download, Settings as SettingsIcon, HelpCircle, FileText, Smartphone, Play } from 'lucide-react';
 import { WebRTCViewerProps } from './WebRTCViewer';
 import { AndroidSimulatorProps } from './AndroidSimulator';
 import { MonacoPlaygroundProps } from './MonacoPlayground';
@@ -16,6 +16,9 @@ import { QRCodeSVG } from 'qrcode.react';
 const MonacoPlayground = dynamic<MonacoPlaygroundProps>(() => import('./MonacoPlayground'), { ssr: false });
 const WebRTCViewer = dynamic<WebRTCViewerProps>(() => import('./WebRTCViewer'), { ssr: false });
 const AndroidSimulator = dynamic<AndroidSimulatorProps>(() => import('./AndroidSimulator'), { ssr: false });
+
+const RNP_DEVICE_INSTALL =
+  'curl -fsSL https://raw.githubusercontent.com/notAryan10/react-native-playground-backend-webrtcDemo/main/rnp-device/install.sh | bash';
 
 const DEFAULT_APP_CODE = `import React from "react";
 import { View, Text, StyleSheet } from "react-native";
@@ -208,12 +211,32 @@ export default function PlaygroundLayout() {
   const [workspaceUrl, setWorkspaceUrl] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>('');
   const [showPairingModal, setShowPairingModal] = useState(false);
+  // null = closed, 'opening' = handed to RNP Device, otherwise an error message.
+  const [androidLaunch, setAndroidLaunch] = useState<null | string>(null);
   const [pairingModalTab, setPairingModalTab] = useState<'pair' | 'download'>('pair');
 
   // The Orchestrator URL:
   // 1. First choice: Environment Variable (set this in Vercel!)
   // 2. Fallback: Localhost (for development)
   const orchestratorUrl = process.env.NEXT_PUBLIC_ORCHESTRATOR_URL || '';
+
+  // Hand off to the RNP Device helper on the user's Mac via rnp://. The page
+  // gets no callback; success is the device connecting in Preview.
+  const startAndroid = async () => {
+    setAndroidLaunch('opening');
+    try {
+      const res = await fetch(`${orchestratorUrl}/pair`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.token) throw new Error(data.error || `pairing failed (HTTP ${res.status})`);
+      window.location.href = `rnp://start?pair=${data.token}&server=${encodeURIComponent(orchestratorUrl)}`;
+    } catch (e) {
+      setAndroidLaunch(e instanceof Error ? e.message : String(e));
+    }
+  };
   useEffect(() => {
     const savedId = localStorage.getItem('playground-user-id');
     if (savedId) {
@@ -709,6 +732,15 @@ export default function PlaygroundLayout() {
             <Download className="w-4 h-4" />
             <span className="text-xs font-bold uppercase tracking-tight">Get APK</span>
           </button>
+
+          <button
+            onClick={startAndroid}
+            disabled={!userId}
+            className="flex items-center gap-2 px-3 py-1 rounded bg-green-600 hover:bg-green-500 transition-colors text-white disabled:opacity-50"
+          >
+            <Play className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase tracking-tight">Start Android</span>
+          </button>
         </div>
         <div className="flex items-center gap-3">
           {workspaceUrl && (
@@ -941,6 +973,44 @@ export default function PlaygroundLayout() {
         onSave={handleSaveSettings}
       />
       
+      {androidLaunch !== null && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full flex flex-col gap-4 relative text-gray-900">
+            <button
+              onClick={() => setAndroidLaunch(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1"
+            >
+              <ArrowLeft className="w-5 h-5 rotate-90" />
+            </button>
+            {androidLaunch === 'opening' ? (
+              <>
+                <h2 className="text-lg font-bold">Opening Android…</h2>
+                <p className="text-sm text-gray-600">
+                  The first launch may take up to a minute. Your device shows up in Preview once it connects.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-lg font-bold">Could not start Android</h2>
+                <p className="text-sm text-red-600">{androidLaunch}</p>
+              </>
+            )}
+            <div className="flex flex-col gap-2 border-t border-gray-200 pt-4">
+              <p className="text-xs text-gray-500">
+                Don&apos;t have RNP Device? Install it once (macOS, with Android Studio and an emulator created in Device Manager):
+              </p>
+              <code className="text-[11px] break-all bg-gray-100 rounded p-2 select-all">{RNP_DEVICE_INSTALL}</code>
+              <button
+                onClick={() => void navigator.clipboard.writeText(RNP_DEVICE_INSTALL)}
+                className="self-start text-xs font-bold text-blue-600 hover:text-blue-500"
+              >
+                Copy install command
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Pairing Modal */}
       {showPairingModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
