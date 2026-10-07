@@ -150,6 +150,44 @@ export default function AndroidSimulator({ orchestratorUrl, userId, colors }: An
         setPhase('ready');
     }, [httpBase]);
 
+    // Attach to this user's runtime: on mount (browser refresh) and after Start,
+    // which returns while the emulator is still booting. Polls through
+    // 'starting' and through the 'stopping' a failed boot passes on its way to 'error'.
+    const reconnect = useCallback(async (attempt = 0): Promise<void> => {
+        if (!userId) return;
+        let live: { runtimeId: string; streamUrl: string } | null = null;
+        try {
+            const res = await fetch(`${httpBase}/android/runtime/rt_${userId}`);
+            if (res.ok) {
+                const info: RuntimeStatusResponse = await res.json();
+                const url = info.stream?.url || info.streamUrl;
+                if (info.status === 'ready' && info.runtimeId && url) {
+                    live = { runtimeId: info.runtimeId, streamUrl: url };
+                } else if (info.status === 'error') {
+                    setPhase('error');
+                    setError(info.error || 'Android runtime failed to start');
+                    return;
+                } else if (info.status === 'starting' || info.status === 'stopping') {
+                    if (attempt >= 150) {
+                        setPhase('error');
+                        setError('Timed out waiting for the emulator to boot');
+                        return;
+                    }
+                    setPhase('starting');
+                    setTimeout(() => void reconnect(attempt + 1), 4000);
+                    return;
+                }
+            }
+        } catch { /* orchestrator unreachable; Start button still works */ }
+        if (live) {
+            setIframeLoaded(false);
+            applyStream(live.runtimeId, live.streamUrl);
+            connectControl(live.runtimeId);
+        } else if (attempt > 0) {
+            setPhase('idle'); // runtime vanished mid-poll (stopped elsewhere)
+        }
+    }, [userId, httpBase, connectControl, applyStream]);
+
     const start = useCallback(async () => {
         if (!userId || phase === 'starting') return;
         setPhase('starting');
@@ -163,44 +201,20 @@ export default function AndroidSimulator({ orchestratorUrl, userId, colors }: An
                 body: JSON.stringify({ userId }),
             });
             const data: StartResponse = await res.json();
-            if (!res.ok || !data.stream?.url || !data.runtimeId) {
+            if (!res.ok || !data.runtimeId) {
                 throw new Error(data.detail || data.error || `start failed (HTTP ${res.status})`);
             }
-            applyStream(data.runtimeId, data.stream.url);
-            connectControl(data.runtimeId);
+            if (data.status === 'ready' && data.stream?.url) {
+                applyStream(data.runtimeId, data.stream.url);
+                connectControl(data.runtimeId);
+            } else {
+                void reconnect(1);
+            }
         } catch (e) {
             setPhase('error');
             setError(String(e instanceof Error ? e.message : e));
         }
-    }, [userId, phase, httpBase, connectControl, applyStream]);
-
-    // Remount == potential browser refresh: reattach to a surviving session.
-    // While a boot is in flight (start clicked, page refreshed mid-boot), poll
-    // instead of double-starting; the backend start is idempotent but polling
-    // avoids a pointless 60s request hang.
-    const reconnect = useCallback(async (attempt = 0): Promise<void> => {
-        if (!userId) return;
-        let live: { runtimeId: string; streamUrl: string } | null = null;
-        try {
-            const res = await fetch(`${httpBase}/android/runtime/rt_${userId}`);
-            if (res.ok) {
-                const info: RuntimeStatusResponse = await res.json();
-                const url = info.stream?.url || info.streamUrl;
-                if (info.status === 'ready' && info.runtimeId && url) {
-                    live = { runtimeId: info.runtimeId, streamUrl: url };
-                } else if (info.status === 'starting' && attempt < 150) {
-                    setTimeout(() => void reconnect(attempt + 1), 4000);
-                    setPhase('starting');
-                    return;
-                }
-            }
-        } catch { /* orchestrator unreachable; Start button still works */ }
-        if (live) {
-            setIframeLoaded(false);
-            applyStream(live.runtimeId, live.streamUrl);
-            connectControl(live.runtimeId);
-        }
-    }, [userId, httpBase, connectControl, applyStream]);
+    }, [userId, phase, httpBase, connectControl, applyStream, reconnect]);
 
     useEffect(() => {
         void reconnect();

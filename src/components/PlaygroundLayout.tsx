@@ -805,9 +805,12 @@ export default function PlaygroundLayout() {
                 </div>
               </div>
               <div className="flex-1 overflow-hidden">
-                {rightPanelTab === 'preview' ? (
+                {/* Both stay mounted: unmounting AndroidSimulator closes its control
+                    socket, and the orchestrator stops the emulator after 45s idle. */}
+                <div className="h-full" style={{ display: rightPanelTab === 'preview' ? 'block' : 'none' }}>
                   <WebRTCViewer signalingUrl={workspaceUrl || ''} />
-                ) : (
+                </div>
+                <div className="h-full" style={{ display: rightPanelTab === 'android' ? 'block' : 'none' }}>
                   <AndroidSimulator
                     orchestratorUrl={orchestratorUrl}
                     userId={userId}
@@ -819,7 +822,7 @@ export default function PlaygroundLayout() {
                       textSecondary: themeColors.textSecondary,
                     }}
                   />
-                )}
+                </div>
               </div>
 
               <div style={{ height: '30%', display: 'flex', flexDirection: 'column', borderTop: `1px solid ${themeColors.border} ` }}>
