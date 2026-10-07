@@ -22,22 +22,16 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   // [0,1] coordinate and ask the device to resolve it. The video element has no
   // explicit height (auto by aspect ratio), so its rect equals the content rect
   // with no letterboxing to compensate for.
-  const handleInspectClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Device coordinate for a pointer position: normalize against the actual
+  // video frame, not the element box. With object-fit: contain the frame is
+  // letterboxed inside the element, so subtract that offset/scale or every tap
+  // is skewed toward an edge. Falls back to the box when intrinsic size is
+  // unknown (no-op letterbox).
+  const toFrameRatio = (clientX: number, clientY: number) => {
     const video = videoRef.current;
-    if (!video) return;
-    const rect = videoRef.current!.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-
-    // Visual tap marker: position within the video element box (the overlay).
-    const boxX = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const boxY = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    setTapMark({ x: boxX, y: boxY });
-    setTimeout(() => setTapMark(null), 1200);
-
-    // Device hit-test coordinate: normalize against the actual video frame, not
-    // the element box. With object-fit: contain the frame is letterboxed inside
-    // the element, so subtract that offset/scale or every tap is skewed toward an
-    // edge. Falls back to the box when intrinsic size is unknown (no-op letterbox).
+    if (!video) return null;
+    const rect = video.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
     const vw = video.videoWidth || rect.width;
     const vh = video.videoHeight || rect.height;
     const scale = Math.min(rect.width / vw, rect.height / vh);
@@ -45,14 +39,58 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
     const contentH = vh * scale;
     const offX = (rect.width - contentW) / 2;
     const offY = (rect.height - contentH) / 2;
-    const nx = Math.min(1, Math.max(0, (e.clientX - rect.left - offX) / contentW));
-    const ny = Math.min(1, Math.max(0, (e.clientY - rect.top - offY) / contentH));
+    return {
+      x: Math.min(1, Math.max(0, (clientX - rect.left - offX) / contentW)),
+      y: Math.min(1, Math.max(0, (clientY - rect.top - offY) / contentH)),
+      boxX: Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)),
+      boxY: Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)),
+    };
+  };
 
-
+  const send = (msg: object) => {
     const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'inspect-at', x: nx, y: ny, requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }));
-    }
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  };
+
+  const handleInspectClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const p = toFrameRatio(e.clientX, e.clientY);
+    if (!p) return;
+    setTapMark({ x: p.boxX, y: p.boxY });
+    setTimeout(() => setTapMark(null), 1200);
+    send({ type: 'inspect-at', x: p.x, y: p.y, requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}` });
+  };
+
+  // Remote touch: pointer down/move/up on the video become touches in the
+  // device app's window. Moves are throttled; a drag at 60Hz would flood the
+  // relay for no visible gain over ~30Hz.
+  const lastMoveRef = useRef(0);
+  const touching = useRef(false);
+  const sendTouch = (action: 'down' | 'move' | 'up' | 'cancel', e: React.PointerEvent<HTMLDivElement>) => {
+    const p = toFrameRatio(e.clientX, e.clientY);
+    if (p) send({ type: 'touch', action, x: p.x, y: p.y });
+  };
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    touching.current = true;
+    sendTouch('down', e);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!touching.current) return;
+    const now = performance.now();
+    if (now - lastMoveRef.current < 33) return;
+    lastMoveRef.current = now;
+    sendTouch('move', e);
+  };
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!touching.current) return;
+    touching.current = false;
+    sendTouch('up', e);
+  };
+  const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!touching.current) return;
+    touching.current = false;
+    sendTouch('cancel', e);
   };
 
   useEffect(() => {
@@ -191,6 +229,16 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
             muted
             style={{ height: '100%', width: 'auto', maxWidth: '100%', objectFit: 'contain', display: 'block' }}
           />
+        {!inspectMode && (
+          <div
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerCancel}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ position: 'absolute', inset: 0, cursor: 'pointer', touchAction: 'none' }}
+          />
+        )}
         {inspectMode && (
           <div
             onClick={handleInspectClick}
