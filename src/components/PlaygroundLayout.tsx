@@ -7,6 +7,7 @@ import { SettingsPanel, Settings } from './SettingsPanel';
 import ConsolePanel, { LogEntry, LogLevel } from './ConsolePanel';
 import { ArrowLeft, Clock, Download, Settings as SettingsIcon, HelpCircle, FileText, Smartphone } from 'lucide-react';
 import { WebRTCViewerProps } from './WebRTCViewer';
+import { AndroidSimulatorProps } from './AndroidSimulator';
 import { MonacoPlaygroundProps } from './MonacoPlayground';
 import { FileExplorer, File } from './FileExplorer';
 import TerminalPanel from './TerminalPanel';
@@ -14,6 +15,7 @@ import { QRCodeSVG } from 'qrcode.react';
 
 const MonacoPlayground = dynamic<MonacoPlaygroundProps>(() => import('./MonacoPlayground'), { ssr: false });
 const WebRTCViewer = dynamic<WebRTCViewerProps>(() => import('./WebRTCViewer'), { ssr: false });
+const AndroidSimulator = dynamic<AndroidSimulatorProps>(() => import('./AndroidSimulator'), { ssr: false });
 
 const DEFAULT_APP_CODE = `import React from "react";
 import { View, Text, StyleSheet } from "react-native";
@@ -225,6 +227,7 @@ export default function PlaygroundLayout() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'terminal' | 'inspector'>('console');
+  const [rightPanelTab, setRightPanelTab] = useState<'preview' | 'android'>('preview');
   
   useEffect(() => {
     if (!userId) return;
@@ -763,7 +766,36 @@ export default function PlaygroundLayout() {
           <Panel defaultSize={40} minSize={20} maxSize={50}>
             <div className="h-full flex flex-col" style={{ backgroundColor: themeColors.bgSecondary }}>
               <div className="px-4 py-2 flex items-center justify-between text-sm" style={{ backgroundColor: themeColors.bgSecondary, borderBottom: `1px solid ${themeColors.border} ` }}>
-                <span className="font-medium">Preview</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setRightPanelTab('preview')}
+                    style={{
+                      padding: '2px 10px',
+                      fontSize: 12,
+                      borderRadius: 4,
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: rightPanelTab === 'preview' ? themeColors.bgPrimary : 'transparent',
+                      color: rightPanelTab === 'preview' ? '#fff' : themeColors.text,
+                    }}
+                  >
+                    Preview
+                  </button>
+                  <button
+                    onClick={() => setRightPanelTab('android')}
+                    style={{
+                      padding: '2px 10px',
+                      fontSize: 12,
+                      borderRadius: 4,
+                      border: 'none',
+                      cursor: 'pointer',
+                      backgroundColor: rightPanelTab === 'android' ? themeColors.bgPrimary : 'transparent',
+                      color: rightPanelTab === 'android' ? '#fff' : themeColors.text,
+                    }}
+                  >
+                    Android
+                  </button>
+                </div>
                 <div className="flex items-center gap-2">
                   {currentSettings.autoRefresh && (
                     <span className="text-xs px-2 py-0.5 rounded bg-green-600 text-white">
@@ -773,7 +805,21 @@ export default function PlaygroundLayout() {
                 </div>
               </div>
               <div className="flex-1 overflow-hidden">
-                <WebRTCViewer signalingUrl={workspaceUrl || ''} />
+                {rightPanelTab === 'preview' ? (
+                  <WebRTCViewer signalingUrl={workspaceUrl || ''} />
+                ) : (
+                  <AndroidSimulator
+                    orchestratorUrl={orchestratorUrl}
+                    userId={userId}
+                    colors={{
+                      bg: themeColors.bg,
+                      bgSecondary: themeColors.bgSecondary,
+                      border: themeColors.border,
+                      text: themeColors.text,
+                      textSecondary: themeColors.textSecondary,
+                    }}
+                  />
+                )}
               </div>
 
               <div style={{ height: '30%', display: 'flex', flexDirection: 'column', borderTop: `1px solid ${themeColors.border} ` }}>
