@@ -228,6 +228,11 @@ export default function PlaygroundLayout() {
   const [showSettings, setShowSettings] = useState(false);
   const [activeBottomTab, setActiveBottomTab] = useState<'console' | 'terminal' | 'inspector'>('console');
   const [rightPanelTab, setRightPanelTab] = useState<'preview' | 'android'>('preview');
+  // Only orchestrators with ANDROID_RUNTIME_ALLOWED=true serve /android/*.
+  const [androidAvailable, setAndroidAvailable] = useState(false);
+  useEffect(() => {
+    fetch(`${orchestratorUrl}/android/runtimes`).then((r) => setAndroidAvailable(r.ok)).catch(() => {});
+  }, [orchestratorUrl]);
   
   useEffect(() => {
     if (!userId) return;
@@ -781,7 +786,7 @@ export default function PlaygroundLayout() {
                   >
                     Preview
                   </button>
-                  <button
+                  {androidAvailable && <button
                     onClick={() => setRightPanelTab('android')}
                     style={{
                       padding: '2px 10px',
@@ -794,7 +799,7 @@ export default function PlaygroundLayout() {
                     }}
                   >
                     Android
-                  </button>
+                  </button>}
                 </div>
                 <div className="flex items-center gap-2">
                   {currentSettings.autoRefresh && (
@@ -810,7 +815,7 @@ export default function PlaygroundLayout() {
                 <div className="h-full" style={{ display: rightPanelTab === 'preview' ? 'block' : 'none' }}>
                   <WebRTCViewer signalingUrl={workspaceUrl || ''} />
                 </div>
-                <div className="h-full" style={{ display: rightPanelTab === 'android' ? 'block' : 'none' }}>
+                {androidAvailable && <div className="h-full" style={{ display: rightPanelTab === 'android' ? 'block' : 'none' }}>
                   <AndroidSimulator
                     orchestratorUrl={orchestratorUrl}
                     userId={userId}
@@ -822,7 +827,7 @@ export default function PlaygroundLayout() {
                       textSecondary: themeColors.textSecondary,
                     }}
                   />
-                </div>
+                </div>}
               </div>
 
               <div style={{ height: '30%', display: 'flex', flexDirection: 'column', borderTop: `1px solid ${themeColors.border} ` }}>
@@ -990,6 +995,13 @@ export default function PlaygroundLayout() {
                     <span className="text-[10px] uppercase font-bold text-gray-400">Workspace ID</span>
                     <span className="text-xs font-mono font-bold text-blue-600">{userId}</span>
                   </div>
+                  {/* An emulator on this machine cannot scan the QR, so offer its payload to paste. */}
+                  <button
+                    onClick={() => void navigator.clipboard.writeText(JSON.stringify({ url: orchestratorUrl, id: userId }))}
+                    className="flex items-center justify-center w-full py-2 px-3 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors"
+                  >
+                    <span className="text-xs font-bold">Copy pairing code (for an emulator)</span>
+                  </button>
                 </>
               ) : (
                 <>
