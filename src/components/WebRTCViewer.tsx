@@ -96,100 +96,121 @@ export default function WebRTCViewer({ signalingUrl }: WebRTCViewerProps) {
   useEffect(() => {
     if (!signalingUrl) return;
 
-    const ws = new WebSocket(signalingUrl);
-    wsRef.current = ws;
+    // Reconnects after a drop (tunnel blip, workspace restart); without this
+    // the viewer stayed dead and Inspect/touch silently went nowhere.
+    let disposed = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    ws.onopen = () => {
-      setStatus('signaling-connected');
-      ws.send(JSON.stringify({
-        type: 'register',
-        clientType: 'web',
-      }));
-    };
+    const connect = () => {
+      // A new signaling session: the old peer connection belongs to a previous
+      // device session (its DTLS identity can't be renegotiated), so start fresh.
+      pcRef.current?.close();
+      pcRef.current = null;
+      const ws = new WebSocket(signalingUrl);
+      wsRef.current = ws;
 
-    ws.onmessage = async (event) => {
-      const msg = JSON.parse(event.data);
-
-      if (msg.type === 'offer') {
-        fromIdRef.current = msg.fromId;
-
-        // Reuse a single peer connection. The mobile re-offers on every
-        // client-connected (editor sync socket, this viewer, each frontend
-        // hot-reload), so building a fresh pc per offer churned ontrack and
-        // reassigned srcObject repeatedly, aborting play() before any frame
-        // rendered (black video). Renegotiation offers now apply to the
-        // existing connection instead.
-        let pc = pcRef.current;
-        if (!pc) {
-          pc = new RTCPeerConnection({
-            iceServers: [
-              { urls: process.env.NEXT_PUBLIC_STUN_SERVER || 'stun:stun.l.google.com:19302' },
-              ...(process.env.NEXT_PUBLIC_TURN_URL ? [{
-                urls: process.env.NEXT_PUBLIC_TURN_URL,
-                username: process.env.NEXT_PUBLIC_TURN_USERNAME,
-                credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
-              }] : []),
-            ],
-          });
-          pcRef.current = pc;
-
-          pc.ontrack = (event) => {
-            const stream = event.streams[0];
-            const v = videoRef.current;
-            if (v && stream && v.srcObject !== stream) {
-              v.srcObject = stream;
-              v.play().catch((err) => console.warn('[WebRTC] video.play() rejected:', err));
-            }
-          };
-
-          // The real signal that media can flow; the SDP answer being sent does
-          // not mean ICE succeeded (it may still fail, e.g. needs TURN).
-          pc.oniceconnectionstatechange = () => {
-            setStatus('ice-' + pc!.iceConnectionState);
-          };
-
-          pc.onicecandidate = (e) => {
-            if (e.candidate) {
-              ws.send(JSON.stringify({
-                type: 'ice-candidate',
-                candidate: e.candidate,
-                targetId: fromIdRef.current,
-              }));
-            }
-          };
-        }
-
-        await pc.setRemoteDescription(msg.offer);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-
+      ws.onopen = () => {
+        setStatus('signaling-connected');
         ws.send(JSON.stringify({
-          type: 'answer',
-          answer,
-          targetId: fromIdRef.current,
+          type: 'register',
+          clientType: 'web',
         }));
-      }
+      };
 
-      if (msg.type === 'ice-candidate') {
-        await pcRef.current?.addIceCandidate(msg.candidate);
-      }
+      ws.onmessage = async (event) => {
+        const msg = JSON.parse(event.data);
 
-      if (msg.type === 'client-disconnected' && msg.clientType === 'mobile') {
-        pcRef.current?.close();
-        pcRef.current = null;
-        fromIdRef.current = undefined;
-        const v = videoRef.current;
-        if (v) {
-          v.srcObject = null;
-          v.removeAttribute('src');
-          v.load();
+        if (msg.type === 'offer') {
+          fromIdRef.current = msg.fromId;
+
+          // Reuse a single peer connection. The mobile re-offers on every
+          // client-connected (editor sync socket, this viewer, each frontend
+          // hot-reload), so building a fresh pc per offer churned ontrack and
+          // reassigned srcObject repeatedly, aborting play() before any frame
+          // rendered (black video). Renegotiation offers now apply to the
+          // existing connection instead.
+          let pc = pcRef.current;
+          if (!pc) {
+            pc = new RTCPeerConnection({
+              iceServers: [
+                { urls: process.env.NEXT_PUBLIC_STUN_SERVER || 'stun:stun.l.google.com:19302' },
+                ...(process.env.NEXT_PUBLIC_TURN_URL ? [{
+                  urls: process.env.NEXT_PUBLIC_TURN_URL,
+                  username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+                  credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+                }] : []),
+              ],
+            });
+            pcRef.current = pc;
+
+            pc.ontrack = (event) => {
+              const stream = event.streams[0];
+              const v = videoRef.current;
+              if (v && stream && v.srcObject !== stream) {
+                v.srcObject = stream;
+                v.play().catch((err) => console.warn('[WebRTC] video.play() rejected:', err));
+              }
+            };
+
+            // The real signal that media can flow; the SDP answer being sent does
+            // not mean ICE succeeded (it may still fail, e.g. needs TURN).
+            pc.oniceconnectionstatechange = () => {
+              setStatus('ice-' + pc!.iceConnectionState);
+            };
+
+            pc.onicecandidate = (e) => {
+              if (e.candidate) {
+                ws.send(JSON.stringify({
+                  type: 'ice-candidate',
+                  candidate: e.candidate,
+                  targetId: fromIdRef.current,
+                }));
+              }
+            };
+          }
+
+          await pc.setRemoteDescription(msg.offer);
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+
+          ws.send(JSON.stringify({
+            type: 'answer',
+            answer,
+            targetId: fromIdRef.current,
+          }));
         }
-        setStatus('device-disconnected');
-      }
+
+        if (msg.type === 'ice-candidate') {
+          await pcRef.current?.addIceCandidate(msg.candidate);
+        }
+
+        if (msg.type === 'client-disconnected' && msg.clientType === 'mobile') {
+          pcRef.current?.close();
+          pcRef.current = null;
+          fromIdRef.current = undefined;
+          const v = videoRef.current;
+          if (v) {
+            v.srcObject = null;
+            v.removeAttribute('src');
+            v.load();
+          }
+          setStatus('device-disconnected');
+        }
+      };
+
+      ws.onclose = () => {
+        if (disposed || wsRef.current !== ws) return;
+        setStatus('signaling-reconnecting');
+        retryTimer = setTimeout(connect, 2000);
+      };
     };
+
+    connect();
 
     return () => {
-      ws.close();
+      disposed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      wsRef.current?.close();
       pcRef.current?.close();
       pcRef.current = null;
     };
